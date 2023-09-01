@@ -31,6 +31,8 @@ SUPPORT=/APSshare/epics/synApps_6_2_1/support
 # Specify the standard synApps configuration.
 -include $(SUPPORT)/configure/RELEASE
 
+CPSC=/local/nmarks/devel/jpe-cpsc/cpsc/
+
 # Include any non-standard support
 #TDS3000 = $(SUPPORT)/../nonSynAppsSupport/tds3000-2.4
 #FLY = $(SUPPORT)/../nonSynAppsSupport/fly-0-0

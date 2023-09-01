@@ -12,11 +12,11 @@ include $(TOP)/configure/CONFIG
 # databases, templates, substitutions like this
 #DB += cpsc.db
 
-DB += $(patsubst ../%, %, $(wildcard ../*.template))
-DB += $(patsubst ../%, %, $(wildcard ../*.db))
-DB += $(patsubst ../%, %, $(wildcard ../*.vdb))
-
-REQ += $(patsubst ../%, %, $(wildcard ../*.req))
+# DB += $(patsubst ../%, %, $(wildcard ../*.template))
+# DB += $(patsubst ../%, %, $(wildcard ../*.db))
+# DB += $(patsubst ../%, %, $(wildcard ../*.vdb))
+#
+# REQ += $(patsubst ../%, %, $(wildcard ../*.req))
 
 #----------------------------------------------------
 # If <anyname>.db template is not named <anyname>*.template add

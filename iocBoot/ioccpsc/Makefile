@@ -7,7 +7,8 @@ include $(TOP)/configure/CONFIG
 #ARCH = windows-x64
 #ARCH = cygwin-x86
 #ARCH = linux-x86
-ARCH = linux-x86_64
+#ARCH = linux-x86_64
+ARCH = rhel9-x86_64
 #ARCH = vxWorks-ppc32
 #ARCH = vxWorks694-ppc32
 #ARCH = vxWorks-ppc603

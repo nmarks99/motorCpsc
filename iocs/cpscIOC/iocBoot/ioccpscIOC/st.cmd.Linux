@@ -38,7 +38,8 @@ dbLoadTemplate("substitutions/asyn_motor.substitutions", "P=$(PREFIX)")
 # load asyn record
 dbLoadRecords("$(ASYN)/db/asynRecord.db", "P=$(PREFIX), R=asyn_1, PORT=CPSC_SERIAL, ADDR=0, OMAX=$(OUT_BUFF=1000), IMAX=$(IN_BUFF=1000)")
 
-CpscMotorCreateController("CPSC1", "CPSC_SERIAL", 1, 250, 1000)
+# Create a controller
+CpscMotorCreateController("CPSC1", "CPSC_SERIAL", 2, 250, 1000)
 
 ###############################################################################
 iocInit

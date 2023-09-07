@@ -89,6 +89,12 @@ void CpscMotorController::report(FILE *fp, int level) {
     asynMotorController::report(fp, level);
 }
 
+void CpscMotorController::dummy_function() {
+    for (size_t i= 0; i < 10; i++) {
+        // do nothing!
+    }
+}
+
 CpscMotorAxis* CpscMotorController::getAxis(asynUser *pasynUser) {
     return static_cast<CpscMotorAxis*>(asynMotorController::getAxis(pasynUser));
 }

@@ -31,6 +31,7 @@ SUPPORT=/APSshare/epics/synApps_6_2_1/support
 # Specify the standard synApps configuration.
 -include $(SUPPORT)/configure/RELEASE
 
+MOTOR=/APSshare/epics/synApps_6_2_1/support/motor-R7-2-2/
 CPSC=/local/nmarks/devel/jpe-cpsc/cpsc/
 
 # Include any non-standard support

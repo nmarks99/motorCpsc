@@ -19,13 +19,13 @@ dbLoadRecords("$(DEVIOCSTATS)/db/iocAdminSoft.db","IOC=$(PREFIX)")
 #- PV aliases change :: into :
 dbLoadRecords("$(TOP)/cpscIOCApp/Db/iocAdminSoft_aliases.db","P=$(PREFIX)")
 
-
 # Configure serial port connection
 drvAsynSerialPortConfigure("CPSC_SERIAL", "/dev/ttyUSB0", 0, 0, 0)
 asynSetOption("CPSC_SERIAL", 0, "baud", "115200")
 
 # debugging
-asynSetTraceMask("CPSC_SERIAL", 0, 1)
+asynSetTraceMask("CPSC_SERIAL", 0, 3)
+# asynSetTraceMask("CPSC_SERIAL", 0, 1)
 asynSetTraceIOMask("CPSC_SERIAL", 0, 1)
 
 # termination characters
@@ -34,6 +34,9 @@ asynOctetSetOutputEos("CPSC_SERIAL",0,"\r\n")
 
 # load asyn motor record
 dbLoadTemplate("substitutions/asyn_motor.substitutions", "P=$(PREFIX)")
+
+# load asyn record
+dbLoadRecords("$(ASYN)/db/asynRecord.db", "P=$(PREFIX), R=asyn_1, PORT=CPSC_SERIAL, ADDR=0, OMAX=$(OUT_BUFF=1000), IMAX=$(IN_BUFF=1000)")
 
 CpscMotorCreateController("CPSC1", "CPSC_SERIAL", 1, 250, 1000)
 

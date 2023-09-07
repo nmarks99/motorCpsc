@@ -1,0 +1,38 @@
+# Linux startup script
+
+< envPaths
+
+# Increase size of buffer for error logging from default 1256
+errlogInit(20000)
+
+################################################################################
+# Tell EPICS all about the record types, device-support modules, drivers,
+# etc. in the software we just loaded (cpscIOC.munch)
+dbLoadDatabase("../../dbd/ioccpscIOCLinux.dbd")
+ioccpscIOCLinux_registerRecordDeviceDriver(pdbbase)
+
+< settings.iocsh
+< common.iocsh
+
+#- devIocStats
+dbLoadRecords("$(DEVIOCSTATS)/db/iocAdminSoft.db","IOC=$(PREFIX)")
+#- PV aliases change :: into :
+dbLoadRecords("$(TOP)/cpscIOCApp/Db/iocAdminSoft_aliases.db","P=$(PREFIX)")
+
+
+# bLoadRecords("$(MOTOR)/db/asyn_motor.db","P=$(PREFIX),M=m1,DTYP=asynMotor,PORT=VMC1,ADDR=0,DESC=X,EGU=mm,DIR=Pos,VELO=1,VBAS=.1,ACCL=.2,BDST=0,BVEL=1,BACC=.2,MRES=.0025,PREC=4,DHLM=100,DLLM=-100,INIT=")
+
+
+
+###############################################################################
+iocInit
+###############################################################################
+
+# write all the PV names to a local file
+dbl > dbl-all.txt
+
+# Diagnostic: CA links in all records
+dbcar(0,1)
+
+# print the time our boot was finished
+date

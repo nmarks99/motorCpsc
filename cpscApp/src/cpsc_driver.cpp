@@ -17,6 +17,10 @@
 #include "cpsc_driver.hpp"
 
 
+// ===================
+// CpscMotorController
+// ===================
+
 #define NUM_PARAMS 0  
 
 CpscMotorController::CpscMotorController(
@@ -70,7 +74,53 @@ extern "C" int CpscMotorCreateController(
 
 }
 
-/** Code for iocsh registration */
+void CpscMotorController::report(FILE *fp, int level) {
+    fprintf(fp, "CPSC Motor Controller driver %s\n", this->portName);
+    fprintf(fp, "    numAxes=%d\n", numAxes_);
+    fprintf(fp, "    moving poll period=%f\n", movingPollPeriod_);
+    fprintf(fp, "    idle poll period=%f\n", idlePollPeriod_);
+
+    /*
+    * It is a good idea to print private variables that were added to the VirtualMotorController class in VirtualMotorDriver.h, here
+    * This allows you to see what is going on by running the "dbior" command from iocsh.
+    */
+
+    // Call the base class method
+    asynMotorController::report(fp, level);
+}
+
+CpscMotorAxis* CpscMotorController::getAxis(asynUser *pasynUser) {
+    return static_cast<CpscMotorAxis*>(asynMotorController::getAxis(pasynUser));
+}
+
+CpscMotorAxis* CpscMotorController::getAxis(int axisNo) {
+    return static_cast<CpscMotorAxis*>(asynMotorController::getAxis(axisNo));
+}
+
+
+// =============
+// CpscMotorAxis
+// =============
+
+CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxis(pC, axisNo), pC_(pC)
+{
+    axisIndex_ = axisNo + 1;
+    setDoubleParam(pC_->motorEncoderPosition_, 0.0);
+    callParamCallbacks();
+}
+
+void CpscMotorAxis::report(FILE *fp, int level) {
+    if (level > 0) {
+        fprintf(fp, " Axis #%d\n", axisNo_);
+        fprintf(fp, " axisIndex_=%d\n", axisIndex_);
+    }
+}
+
+
+// ==================
+// iosch registration
+// ==================
+
 static const iocshArg CpscMotorCreateControllerArg0 = {"Port name", iocshArgString};
 static const iocshArg CpscMotorCreateControllerArg1 = {"VMC port name", iocshArgString};
 static const iocshArg CpscMotorCreateControllerArg2 = {"Number of axes", iocshArgInt};

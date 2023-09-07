@@ -4,6 +4,7 @@
 class epicsShareClass CpscMotorAxis : public asynMotorAxis {
     public:
         CpscMotorAxis(class CpscMotorController *pC, int axisNo);
+        void report(FILE *fp, int level);
 
     private:
         CpscMotorController *pC_;

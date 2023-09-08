@@ -6,9 +6,9 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
         CpscMotorAxis(class CpscMotorController *pC, int axisNo);
 
         void report(FILE *fp, int level);
-        asynStatus move(double position, int relative, double min_velocity, double max_velocity, double acceleration);
         asynStatus stop(double acceleration);
-        asynStatus poll(bool *moving);
+        // asynStatus move(double position, int relative, double min_velocity, double max_velocity, double acceleration);
+        // asynStatus poll(bool *moving);
 
     private:
         CpscMotorController *pC_;

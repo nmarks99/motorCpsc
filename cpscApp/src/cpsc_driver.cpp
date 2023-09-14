@@ -2,6 +2,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <algorithm>
+#include <sstream>
+#include <iterator>
 
 #include <iocsh.h>
 #include <epicsThread.h>
@@ -16,12 +19,25 @@
 
 #include "cpsc_driver.hpp"
 
+// splits a char array into a std::vector<double>
+std::vector<double> parse_char_arr(const char *msg, char delimiter=',') {
+    // copies char* to std::string, replaces delimiter with spaces,
+    // creates an istringstream from the string and splits by whitespace,
+    // and finally, converts each substring to a double and stores it in a
+    // std::vector<double> and returns it
+    std::string s_msg(msg);
+    std::replace(s_msg.begin(), s_msg.end(), delimiter, ' ');
+    std::istringstream ss(s_msg);
+    std::vector<double> v_out{std::istream_iterator<double>(ss), {}};
+    return v_out;
+}
 
 // ===================
 // CpscMotorController
 // ===================
 
-#define NUM_PARAMS 0  
+// #define NUM_PARAMS 0 
+static const int NUM_PARAMS = 0;
 
 /// \brief Create a new CpscMotorController object
 ///
@@ -128,9 +144,15 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
 {
     axisIndex_ = axisNo + 1;
     setDoubleParam(pC_->motorEncoderPosition_, 0.0);
+    
+    // enable closed loop positioning
+    sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
+    pC_->writeReadController();
+
     callParamCallbacks();
 }
 
+/// \brief Report on the axis
 void CpscMotorAxis::report(FILE *fp, int level) {
     if (level > 0) {
         fprintf(fp, " Axis #%d\n", axisNo_);
@@ -139,13 +161,92 @@ void CpscMotorAxis::report(FILE *fp, int level) {
     asynMotorAxis::report(fp, level);
 }
 
+
+/// \brief Stop the axis
 asynStatus CpscMotorAxis::stop(double acceleration) {
     asynStatus status;
     sprintf(pC_->outString_, "STP %d", axisIndex_);
     status = pC_->writeReadController();
+    
+    // TESTING POLLING HERE
+    // asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Stop pressed\n");
+    // sprintf(pC_->outString_, "PGVA 4 CBS10-RLS CBS10-RLS CBS10-RLS");
+    // status = pC_->writeReadController();
+    // std::vector<double> v = parse_char_arr(pC_->inString_, ',');
+    // asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Recieved: %lf, %lf, %lf\n", v.at(0), v.at(1), v.at(2));
+
     return status;
 }
 
+
+/// \brief Move the axis
+asynStatus CpscMotorAxis::move(double position, int relative, double min_velocity, double max_velocity, double acceleration) {
+    // MOV [ADDR] [DIR] [FREQ] [RSS] [STEPS] [TEMP] [STAGE] [DF]
+    // e.g. MOV 1 1 600 100 0 293 CLA2601 1
+    asynStatus status;
+    sprintf(pC_->outString_, "MOV %d 1 600 100 0 293 CLA2601 1", axisIndex_);
+    status = pC_->writeReadController();
+    return status;
+}
+
+
+asynStatus CpscMotorAxis::poll(bool *moving) {
+    asynStatus asyn_status;
+    
+    // Read position
+    sprintf(pC_->outString_, "PGV 4 %d CBS10-RLS", axisIndex_);
+    asyn_status = pC_->writeReadController();
+    if (asyn_status) {
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error reading position\n");
+        setIntegerParam(pC_->motorStatusProblem_, asyn_status);
+        callParamCallbacks();
+        return asyn_status ? asynError : asynSuccess;
+    }
+    double position = atof((const char *) &pC_->inString_);
+    // asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Position read = %lf\n", position);
+    setDoubleParam(pC_->motorPosition_, position);
+    
+    // Read status 
+    // [ENABLED] [FINISHED] [INVALID SP1] [INVALID SP2] [INVALID SP3] [POS ERROR1] [POS ERROR2] [POS ERROR3]
+    sprintf(pC_->outString_, "FBST");
+    asyn_status = pC_->writeReadController();
+    if (asyn_status) {
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error reading status\n");
+        setIntegerParam(pC_->motorStatusProblem_, asyn_status);
+        callParamCallbacks();
+        return asyn_status ? asynError : asynSuccess;
+    }
+    std::vector<double> status = parse_char_arr(pC_->inString_, ',');
+    int done = status.at(1);
+    // asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Done = %d\n", done);
+    setIntegerParam(pC_->motorStatusDone_, done);
+    setIntegerParam(pC_->motorStatusMoving_, !done);
+    *moving = !status.at(1);
+
+    setIntegerParam(pC_->motorStatusProblem_, asyn_status);
+    callParamCallbacks();
+    return asyn_status ? asynError : asynSuccess;
+}
+
+
+/// \brief Enable closed loop (Servodrive mode)
+asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
+    // doesn't work?
+    asynStatus status;
+
+    if (closedLoop) {
+        // enable closed loop
+        // FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "true");
+    }
+    else {
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "false");
+    }
+    // sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
+    // status = pC_->writeReadController();
+    
+    return status;
+}
 
 
 

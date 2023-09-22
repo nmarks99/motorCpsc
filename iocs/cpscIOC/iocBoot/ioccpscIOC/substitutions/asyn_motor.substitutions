@@ -3,7 +3,6 @@ file "$(MOTOR)/db/asyn_motor.db"
   pattern
   {M,  DTYP,        PORT,     ADDR,  DESC,    EGU,      DIR,  VMAX,  VELO,  VBAS,  ACCL,  BDST,     BVEL,  BACC,     MRES,      PREC,  DHLM,       DLLM,   INIT}
   { m1, "asynMotor", CPSC1,   0,    "Motor 1",    mm,       Pos,  15.,   3.,    .05,    .5,    0,       1.0,    2,    .025,    5,   0,       0,  ""}
-  { m2, "asynMotor", CPSC1,  0,    "Motor 2",     mm,       Pos,  15.,   3.,    .05,    .5,    0,       1.0,    2,    .025,    5,   0,       0,  ""}
-  { m3, "asynMotor", CPSC1,  0,    "Motor 3",     mm,       Pos,  15.,   3.,    .05,    .5,    0,       1.0,    2,    .025,    5,   0,       0,  ""}
-  { m4, "asynMotor", CPSC1,  0,    "Motor 4",     mm,       Pos,  15.,   3.,    .05,    .5,    0,       1.0,    2,    .025,    5,   0,       0,  ""}
+  { m2, "asynMotor", CPSC1,  1,    "Motor 2",     mm,       Pos,  15.,   3.,    .05,    .5,    0,       1.0,    2,    .025,    5,   0,       0,  ""}
+  { m3, "asynMotor", CPSC1,  2,    "Motor 3",     mm,       Pos,  15.,   3.,    .05,    .5,    0,       1.0,    2,    .025,    5,   0,       0,  ""}
 }

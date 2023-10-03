@@ -20,11 +20,12 @@ dbLoadRecords("$(DEVIOCSTATS)/db/iocAdminSoft.db","IOC=$(PREFIX)")
 dbLoadRecords("$(TOP)/cpscIOCApp/Db/iocAdminSoft_aliases.db","P=$(PREFIX)")
 
 # Connect to device (ethernet or serial)
-#! epicsEnvSet("PORT_NAME", "CPSC_ETH") 
-#! drvAsynIPPortConfigure("$(PORT_NAME)", "164.54.115.41:2000")
-epicsEnvSet("PORT_NAME", "CPSC_SERIAL") 
-drvAsynSerialPortConfigure("$(PORT_NAME)", "/dev/ttyUSB0", 0, 0, 0)
-asynSetOption("$(PORT_NAME)", 0, "baud", "115200")
+epicsEnvSet("PORT_NAME", "CPSC_ETH") 
+drvAsynIPPortConfigure("$(PORT_NAME)", "164.54.115.41:2000")
+
+# epicsEnvSet("PORT_NAME", "CPSC_SERIAL") 
+# drvAsynSerialPortConfigure("$(PORT_NAME)", "/dev/ttyUSB0", 0, 0, 0)
+# asynSetOption("$(PORT_NAME)", 0, "baud", "115200")
 
 # debugging
 asynSetTraceMask("$(PORT_NAME)", 0, 1)
@@ -40,7 +41,7 @@ dbLoadTemplate("substitutions/asyn_motor.substitutions", "P=$(PREFIX)")
 # load asyn record
 dbLoadRecords("$(ASYN)/db/asynRecord.db", "P=$(PREFIX), R=asyn_1, PORT=$(PORT_NAME), ADDR=0, OMAX=$(OUT_BUFF=1000), IMAX=$(IN_BUFF=1000)")
 
-# Create a controller with 4 axes
+# Create a controller with axes
 CpscMotorCreateController("CPSC1", "$(PORT_NAME)", 3, 250, 1000)
 
 ###############################################################################

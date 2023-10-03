@@ -41,7 +41,7 @@ static const int NUM_PARAMS = 0;
 /// \brief Create a new CpscMotorController object
 ///
 /// \param[in] portName             The name of the asyn port that will be created for this driver
-/// \param[in] VirtualMotorPortName The name of the drvAsynSerialPort that was created previously to connect to the VirtualMotor controller 
+/// \param[in] CpscPortName The name of the drvAsynIPPort that was created previously 
 /// \param[in] numAxes              The number of axes that this controller supports 
 /// \param[in] movingPollPeriod     The time between polls when any axis is moving 
 /// \param[in] idlePollPeriod       The time between polls when no axis is moving 
@@ -86,11 +86,11 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     startPoller(movingPollPeriod, idlePollPeriod, 2);
 }
 
-/// \breif Creates a new VirtualMotorController object.
+/// \breif Creates a new CpscMotorController object.
 ///
 /// Configuration command, called directly or from iocsh
 /// \param[in] portName             The name of the asyn port that will be created for this driver
-/// \param[in] VirtualMotorPortName The name of the drvAsynIPPPort that was created previously to connect to the VirtualMotor controller 
+/// \param[in] CpscMotorPortName The name of the drvAsynIPPPort that was created previously 
 /// \param[in] numAxes              The number of axes that this controller supports 
 /// \param[in] movingPollPeriod     The time in ms between polls when any axis is moving
 /// \param[in] idlePollPeriod       The time in ms between polls when no axis is moving 
@@ -154,7 +154,7 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
     asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "CpscMotorAxis created with axis index: %d\n", axisIndex_);
     
     // enable closed loop positioning
-    sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
+    sprintf(pC_->outString_, "FBEN CBS10-RLS 600 CBS10-RLS 600 CBS10-RLS 600 1 293");
     pC_->writeReadController();
 
     callParamCallbacks();

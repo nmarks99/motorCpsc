@@ -16,6 +16,8 @@
 
 #include "cpsc_driver.hpp"
 
+const unsigned long int PREC = 12;
+
 // splits a char array into a std::vector<double>
 std::vector<double> split_char_arr(const char *msg, char delimiter=',') {
     // copies char* to std::string, replaces delimiter with spaces,
@@ -75,11 +77,8 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     for (axis = 0; axis < numAxes; axis++) {
         pAxis = new CpscMotorAxis(this, axis);
     }
-
+    
     // additional controller (not axis specific) initialization:
-    motorStatusHasEncoder_ = 1;
-    motorStatusGainSupport_ = 1;
-    this->motorResolution_ = 1.0;
 
     startPoller(movingPollPeriod, idlePollPeriod, 2);
 }
@@ -149,13 +148,15 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
     axisIndex_ = axisNo + 1;
     setDoubleParam(pC_->motorEncoderPosition_, 0.0);
     setDoubleParam(pC_->motorPosition_, 0.0);
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "CpscMotorAxis created with axis index: %d\n", axisIndex_);
-    
-    // enable closed loop positioning
-    sprintf(pC_->outString_, "FBEN CBS10-RLS 600 CBS10-RLS 600 CBS10-RLS 600 1 293");
-    pC_->writeReadController();
+    setDoubleParam(pC_->motorResolution_, 1.0);
 
+    // enables setClosedLoop function:
+    setIntegerParam(pC_->motorStatusHasEncoder_, 1);
+    setIntegerParam(pC_->motorStatusGainSupport_, 1);
+
+    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "CpscMotorAxis created with axis index: %d\n", axisIndex_);
     callParamCallbacks();
+    
 }
 
 /// \brief Report on the axis
@@ -191,20 +192,21 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
     switch (axisIndex_) {
         case 1:
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %lf 1 0 0 0 0\n", position);
-            sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
+            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "\n");
+            // sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
             break;
         case 2: 
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %lf 0 0 0\n", position);
-            sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
+            // sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
             break;
         case 3: 
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %lf 0\n", position);
-            sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
+            // sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
             break;
         default:
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
     }
-    status = pC_->writeReadController();
+    // status = pC_->writeReadController();
     return status;
 }
 
@@ -272,15 +274,17 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
     if (closedLoop) {
         // enable closed loop
         // add check for whether or not controller is already in closed loop mode
-        // sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "true");
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Feedback mode enabled\r\n");
+        sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
 
     }
     else {
         // disable closed loop
-        // sprintf(pC_->outString_, "FBXT");
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "false");
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Feedback mode disabled\r\n");
+        sprintf(pC_->outString_, "FBXT");
     }
+
+    status = pC_->writeReadController();
     return status;
 }
 

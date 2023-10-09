@@ -181,29 +181,27 @@ asynStatus CpscMotorAxis::stop(double acceleration) {
 
 /// \brief Move the axis
 asynStatus CpscMotorAxis::move(double position, int relative, double min_velocity, double max_velocity, double acceleration) {
-    // MOV [ADDR] [DIR] [FREQ] [RSS] [STEPS] [TEMP] [STAGE] [DF]
-    // e.g. MOV 1 1 600 100 0 293 CLA2601 1
-    //
     // Go to setpoint
     // FBCS [SP1] [ABS] [SP2] [ABS] [SP3] [ABS]
-    // e.g. FBCS -1e-3 0 0 0 0 0 (meters)
-    // e.g. FBCS 6.28 0 0 0 0 0 (radians)
+    // [SPx] - setpoint in meters
+    // [ABS] - 1 absolute positioning (relative to center of stage)
+    //       - 0 relative position (relative to current position)
     asynStatus status;
 
-    // sets the setpoint for the current axis to "position" and 
-    // the setpoint for the other axes to 0.
+    // sets the setpoint for the current axis to "position" absolute
+    // other axes are set to move 0.0 relative to their current position
     switch (axisIndex_) {
         case 1:
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %lf 0 0 0 0 0\n", position);
-            sprintf(pC_->outString_, "FBCS %lf 0 0 0 0 0", position);
+            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %lf 1 0 0 0 0\n", position);
+            sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
             break;
         case 2: 
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %lf 0 0 0\n", position);
-            sprintf(pC_->outString_, "FBCS 0 0 %lf 0 0 0", position);
+            sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
             break;
         case 3: 
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %lf 0\n", position);
-            sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 0", position);
+            sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
             break;
         default:
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
@@ -225,8 +223,8 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
         callParamCallbacks();
         return asyn_status ? asynError : asynSuccess;
     }
+    // this doesn't make sense because motorPosition_ is an integer
     double position = atof((const char *) &pC_->inString_);
-    // asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Pos: %lf\n", position);
     setDoubleParam(pC_->motorPosition_, position);
     
     // Read status 
@@ -271,16 +269,18 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
 
 /// \brief Enable closed loop (Servodrive mode)
 asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
-    // doesn't work?
     asynStatus status;
 
     if (closedLoop) {
-        // enable closed loop
         // FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "true");
+        sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
+        status = pC_->writeReadController();
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Closed loop enabled");
     }
     else {
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "false");
+        sprintf(pC_->outString_, "FBXT");
+        status = pC_->writeReadController();
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Closed loop disabled");
     }
     return status;
 }

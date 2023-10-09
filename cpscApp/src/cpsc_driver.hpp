@@ -15,7 +15,6 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
     private:
         CpscMotorController *pC_;
         int axisIndex_;
-        asynStatus send_vel_and_acc(double base_velocity, double velocity, double acceleration);
 
     friend class CpscMotorController;
 };

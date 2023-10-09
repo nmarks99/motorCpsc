@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <math.h>
 #include <algorithm>
 #include <sstream>
@@ -79,9 +76,10 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
         pAxis = new CpscMotorAxis(this, axis);
     }
 
-    //
-    // additional controller (no axis specific) initialization goes here
-    // 
+    // additional controller (not axis specific) initialization:
+    motorStatusHasEncoder_ = 1;
+    motorStatusGainSupport_ = 1;
+    this->motorResolution_ = 1.0;
 
     startPoller(movingPollPeriod, idlePollPeriod, 2);
 }
@@ -272,15 +270,16 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
     asynStatus status;
 
     if (closedLoop) {
-        // FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293
-        sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
-        status = pC_->writeReadController();
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Closed loop enabled");
+        // enable closed loop
+        // add check for whether or not controller is already in closed loop mode
+        // sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "true");
+
     }
     else {
-        sprintf(pC_->outString_, "FBXT");
-        status = pC_->writeReadController();
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Closed loop disabled");
+        // disable closed loop
+        // sprintf(pC_->outString_, "FBXT");
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "false");
     }
     return status;
 }

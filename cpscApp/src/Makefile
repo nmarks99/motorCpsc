@@ -18,7 +18,7 @@ DBD += cpscSupport.dbd
 cpscSupport_DBD += cpsc.dbd
 
 # specify all source files to be compiled and added to the library
-cpsc_SRCS += cpsc_driver.cpp
+cpsc_SRCS += cpsc_driver.cpp utils.cpp
 
 cpsc_LIBS += motor asyn
 cpsc_LIBS += $(EPICS_BASE_IOC_LIBS)

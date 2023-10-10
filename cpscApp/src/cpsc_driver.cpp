@@ -1,9 +1,4 @@
 #include <math.h>
-#include <algorithm>
-#include <sstream>
-#include <iterator>
-#include <map>
-#include <random>
 #include <iostream>
 
 #include <iocsh.h>
@@ -18,56 +13,11 @@
 #include <epicsExport.h>
 
 #include "cpsc_driver.hpp"
+#include "utils.hpp"
+using utils::Color;
 
 // readback is in meters with nanometer precision
 const long int PREC = 9; 
-
-double gen_random_float(double min, double max) {
-    std::random_device rd;  // obtain a random number from hardware
-    std::mt19937 eng(rd()); // seed the generator
-
-    std::uniform_real_distribution<> distribution(min, max); // define the range
-
-    return distribution(eng); // generate the random number
-}
-
-enum Color {
-    RED,
-    GREEN,
-    BLUE,
-    YELLOW,
-    RESET
-};
-
-std::string stylize_string(std::string s, Color color) {
-    std::map<Color, std::string> color_map = {
-        {RED, "\x1b[31m"},
-        {GREEN, "\x1B[32m"},
-        {BLUE, "\x1B[34m"},
-        {YELLOW, "\x1B[33m"},
-        {RESET,"\x1b[0m"},
-    };
-
-    std::stringstream ss;
-    ss << color_map[color];
-    ss << s;
-    ss << color_map[Color::RESET];
-    return ss.str();
-}
-
-// splits a char array into a std::vector<double>
-std::vector<double> split_char_arr(const char *msg, char delimiter=',') {
-    // copies char* to std::string, replaces delimiter with spaces,
-    // creates an istringstream from the string and splits by whitespace,
-    // and finally, converts each substring to a double and stores it in a
-    // std::vector<double> and returns it
-    std::string s_msg(msg);
-    std::replace(s_msg.begin(), s_msg.end(), delimiter, ' ');
-    std::istringstream ss(s_msg);
-    std::vector<double> v_out{std::istream_iterator<double>(ss), {}};
-    return v_out;
-}
-
 
 // ===================
 // CpscMotorController
@@ -191,8 +141,8 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
     // enables setClosedLoop function:
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
     setIntegerParam(pC_->motorStatusGainSupport_, 1);
-    once = true;
 
+    once = true;
     asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "CpscMotorAxis created with axis index: %d\n", axisIndex_);
     callParamCallbacks();
     
@@ -288,7 +238,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     }
 
     // split input char* by ',' into a std::vector<double>
-    status = split_char_arr(pC_->inString_, ',');
+    status = utils::split_char_arr(pC_->inString_, ',');
     
     // get done status
     done = status.at(1);
@@ -302,7 +252,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
             asynPrint(
                 pasynUser_,
                 ASYN_TRACE_ERROR,
-                stylize_string("Error(%d): Feedback mode is disabled\n", Color::RED).c_str(),
+                utils::stylize_string("Error(%d): Feedback mode is disabled\n", Color::RED).c_str(),
                 axisIndex_
             );
             once = false;

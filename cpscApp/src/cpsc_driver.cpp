@@ -2,6 +2,9 @@
 #include <algorithm>
 #include <sstream>
 #include <iterator>
+#include <map>
+#include <random>
+#include <iostream>
 
 #include <iocsh.h>
 #include <epicsThread.h>
@@ -16,7 +19,41 @@
 
 #include "cpsc_driver.hpp"
 
-const unsigned long int PREC = 12;
+// readback is in meters with nanometer precision
+const long int PREC = 9; 
+
+double gen_random_float(double min, double max) {
+    std::random_device rd;  // obtain a random number from hardware
+    std::mt19937 eng(rd()); // seed the generator
+
+    std::uniform_real_distribution<> distribution(min, max); // define the range
+
+    return distribution(eng); // generate the random number
+}
+
+enum Color {
+    RED,
+    GREEN,
+    BLUE,
+    YELLOW,
+    RESET
+};
+
+std::string stylize_string(std::string s, Color color) {
+    std::map<Color, std::string> color_map = {
+        {RED, "\x1b[31m"},
+        {GREEN, "\x1B[32m"},
+        {BLUE, "\x1B[34m"},
+        {YELLOW, "\x1B[33m"},
+        {RESET,"\x1b[0m"},
+    };
+
+    std::stringstream ss;
+    ss << color_map[color];
+    ss << s;
+    ss << color_map[Color::RESET];
+    return ss.str();
+}
 
 // splits a char array into a std::vector<double>
 std::vector<double> split_char_arr(const char *msg, char delimiter=',') {
@@ -30,6 +67,7 @@ std::vector<double> split_char_arr(const char *msg, char delimiter=',') {
     std::vector<double> v_out{std::istream_iterator<double>(ss), {}};
     return v_out;
 }
+
 
 // ===================
 // CpscMotorController
@@ -153,6 +191,7 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
     // enables setClosedLoop function:
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
     setIntegerParam(pC_->motorStatusGainSupport_, 1);
+    once = true;
 
     asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "CpscMotorAxis created with axis index: %d\n", axisIndex_);
     callParamCallbacks();
@@ -172,7 +211,9 @@ void CpscMotorAxis::report(FILE *fp, int level) {
 /// \brief Stop the axis
 asynStatus CpscMotorAxis::stop(double acceleration) {
     asynStatus status;
-    sprintf(pC_->outString_, "STP %d", axisIndex_);
+    // sprintf(pC_->outString_, "STP %d", axisIndex_);
+    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBES\n");
+    sprintf(pC_->outString_, "FBES"); // Feedback mode E-stop
     status = pC_->writeReadController();
     return status;
 }
@@ -192,15 +233,14 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
     switch (axisIndex_) {
         case 1:
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %lf 1 0 0 0 0\n", position);
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "\n");
             // sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
             break;
         case 2: 
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %lf 0 0 0\n", position);
+            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %lf 1 0 0\n", position);
             // sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
             break;
         case 3: 
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %lf 0\n", position);
+            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %lf 1\n", position);
             // sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
             break;
         default:
@@ -213,6 +253,9 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
 
 asynStatus CpscMotorAxis::poll(bool *moving) {
     asynStatus asyn_status;
+    double position;
+    int done;
+    std::vector<double> status;
     
     // Read position
     sprintf(pC_->outString_, "PGV 4 %d CBS10-RLS", axisIndex_);
@@ -223,9 +266,15 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
         callParamCallbacks();
         return asyn_status ? asynError : asynSuccess;
     }
-    // this doesn't make sense because motorPosition_ is an integer
-    double position = atof((const char *) &pC_->inString_);
-    setDoubleParam(pC_->motorPosition_, position);
+
+    // Adjust MRES to obtain the desired units of the readback values
+    // MRES = 1.0 -> nanometers
+    // MRES = 1e-3 -> micrometers
+    // MRES = 1e-6 -> millimeters
+    // MRES = 1e-9 -> meters
+    position = atof((const char *) &pC_->inString_);
+    long long_position = position * pow(10, PREC);
+    setDoubleParam(pC_->motorPosition_, long_position);
     
     // Read status 
     // [ENABLED] [FINISHED] [INVALID SP1] [INVALID SP2] [INVALID SP3] [POS ERROR1] [POS ERROR2] [POS ERROR3]
@@ -238,18 +287,26 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
         return asyn_status ? asynError : asynSuccess;
     }
 
-    // split input by "," into a std::vector<double>
-    std::vector<double> status = split_char_arr(pC_->inString_, ',');
+    // split input char* by ',' into a std::vector<double>
+    status = split_char_arr(pC_->inString_, ',');
     
     // get done status
-    int done = status.at(1);
+    done = status.at(1);
     setIntegerParam(pC_->motorStatusDone_, done);
     setIntegerParam(pC_->motorStatusMoving_, !done);
     *moving = !status.at(1);
    
     // Handle error codes
     if (!status.at(0)) {
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Feedback mode is disabled\n");
+        if (once) {
+            asynPrint(
+                pasynUser_,
+                ASYN_TRACE_ERROR,
+                stylize_string("Error(%d): Feedback mode is disabled\n", Color::RED).c_str(),
+                axisIndex_
+            );
+            once = false;
+        }
     }
     if (int(status.at(2)) == 1) {
          asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 1\n");
@@ -260,7 +317,8 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     if (int(status.at(4)) == 1) {
          asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 3\n");
     }
-
+    
+    // skip:
     setIntegerParam(pC_->motorStatusProblem_, asyn_status);
     callParamCallbacks();
     return asyn_status ? asynError : asynSuccess;

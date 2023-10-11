@@ -10,3 +10,14 @@ To start the IOC run the following:
 cd ./iocBoot/ioccpscIOC/
 ../../bin/rhel9-x86_64/cpscIOC st.cmd.Linux
 ```
+
+## Units
+Adjust MRES to set the desired units for readback and commanded positions.
+
+| MRES   | EGUs    |
+|--------------- | --------------- |
+| 1.0   | nanometers   |
+| 1e-3   | micrometerse   |
+| 1e-6   | millimeters   |
+| 1e-9   | meters   |
+

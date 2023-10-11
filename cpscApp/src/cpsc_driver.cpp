@@ -1,6 +1,5 @@
 #include <iomanip>
 #include <math.h>
-#include <iostream>
 
 #include <iocsh.h>
 #include <epicsThread.h>
@@ -14,7 +13,7 @@
 #include <epicsExport.h>
 
 #include "cpsc_driver.hpp"
-#include "utils.hpp"
+// #include "utils.hpp"
 using utils::Color;
 using utils::stylize_string;
 
@@ -135,8 +134,8 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
 {
 
     axisIndex_ = axisNo + 1;
-    // setDoubleParam(pC_->motorEncoderPosition_, 0.0);
-    // setDoubleParam(pC_->motorPosition_, 0.0);
+    once = true;
+    fben = false;
 
     // enables setClosedLoop function:
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
@@ -149,7 +148,6 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
         axisIndex_
     );
 
-    once = true;
     callParamCallbacks();
     
 }
@@ -167,9 +165,16 @@ void CpscMotorAxis::report(FILE *fp, int level) {
 /// \brief Stop the axis
 asynStatus CpscMotorAxis::stop(double acceleration) {
     asynStatus status;
-    // sprintf(pC_->outString_, "STP %d", axisIndex_);
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBES\n");
-    sprintf(pC_->outString_, "FBES"); // Feedback mode E-stop
+    if (fben) {
+        // Feedback mode E-stop
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBES\n");
+        sprintf(pC_->outString_, "FBES"); 
+    }
+    else {
+        // Open-loop mode stop axis
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "STP %d\n", axisIndex_);
+        sprintf(pC_->outString_, "STP %d", axisIndex_);
+    }
     status = pC_->writeReadController();
     return status;
 }
@@ -183,33 +188,43 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
     // [ABS] - 1 absolute positioning (relative to center of stage)
     //       - 0 relative position (relative to current position)
     asynStatus status;
+    
+    if (fben) {
+        // pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &mres);
+        position = position / MULT; // convert to meters before sending
 
-    // pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &mres);
-    position = position / MULT; // convert to meters before sending
-
-    // sets the setpoint for the current axis to "position" absolute
-    // other axes are set to move 0.0 relative to their current position
-    switch (axisIndex_) {
-        case 1:
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %.9lf 1 0 0 0 0\n", position);
-            // sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
-            break;
-        case 2: 
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %.9lf 1 0 0\n", position);
-            // sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
-            break;
-        case 3: 
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %.9lf 1\n", position);
-            // sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
-            break;
-        default:
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
+        // sets the setpoint for the current axis to "position" absolute
+        // other axes are set to move 0.0 relative to their current position
+        switch (axisIndex_) {
+            case 1:
+                asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %.9lf 1 0 0 0 0\n", position);
+                // sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
+                break;
+            case 2: 
+                asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %.9lf 1 0 0\n", position);
+                // sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
+                break;
+            case 3: 
+                asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %.9lf 1\n", position);
+                // sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
+                break;
+            default:
+                asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
+        }
+    }
+    else {
+        asynPrint(
+            pasynUser_,
+            ASYN_TRACE_ERROR,
+            stylize_string("Warning(Axis %d): Feedback mode is disabled\n", Color::YELLOW).c_str(),
+            axisIndex_
+        );
     }
     // status = pC_->writeReadController();
     return status;
 }
 
-
+/// \brief Poll the axis
 asynStatus CpscMotorAxis::poll(bool *moving) {
     asynStatus asyn_status;
     double position_m = 0.0;
@@ -236,8 +251,17 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     long_position_nm = MULT * position_m;
     setDoubleParam(pC_->motorPosition_, long_position_nm); // RRBV [nanometers]
     
+    enum FBStatus {
+        ENABLED = 0,
+        DONE = 1,
+        INVALID_SP1 = 2,
+        INVALID_SP2 = 3,
+        INVALID_SP3 = 4,
+        POS_ERROR1 = 5,
+        POS_ERROR2 = 6,
+        POS_ERROR3 = 7
+    };
     // Read status 
-    // [ENABLED] [FINISHED] [INVALID SP1] [INVALID SP2] [INVALID SP3] [POS ERROR1] [POS ERROR2] [POS ERROR3]
     sprintf(pC_->outString_, "FBST");
     asyn_status = pC_->writeReadController();
     if (asyn_status) {
@@ -249,10 +273,9 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
 
     // split input char* by ',' into a std::vector<double>
     status = utils::split_char_arr(pC_->inString_, ',');
-    
 
     // Handle error codes
-    if (!status.at(0)) {
+    if (not status.at(ENABLED)) {
         if (once) {
             asynPrint(
                 pasynUser_,
@@ -262,19 +285,20 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
             );
             once = false;
         }
+        fben = false;
         done = 1;
         setIntegerParam(pC_->motorStatusDone_, done);
         setIntegerParam(pC_->motorStatusMoving_, !done);
         *moving = 0;
     }
     else {
-        // get done status
-        done = status.at(1);
+        fben = true;
+        done = status.at(FBStatus::DONE);
         setIntegerParam(pC_->motorStatusDone_, done);
         setIntegerParam(pC_->motorStatusMoving_, !done);
         *moving = !status.at(1);
 
-        if (int(status.at(2)) == 1) {
+        if (status.at(FBStatus::INVALID_SP1)) {
             asynPrint(
                 pasynUser_,
                 ASYN_TRACE_ERROR,
@@ -282,7 +306,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
                 axisIndex_
             );
         }
-        if (int(status.at(3)) == 1) {
+        if (status.at(FBStatus::INVALID_SP2)) {
             asynPrint(
                 pasynUser_,
                 ASYN_TRACE_ERROR,
@@ -290,7 +314,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
                 axisIndex_
             );
         }
-        if (int(status.at(4)) == 1) {
+        if (status.at(FBStatus::INVALID_SP3)) {
             asynPrint(
                 pasynUser_,
                 ASYN_TRACE_ERROR,

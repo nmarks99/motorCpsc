@@ -1,5 +1,8 @@
+#include "asynDriver.h"
 #include "asynMotorController.h"
 #include "asynMotorAxis.h"
+#include "utils.hpp"
+#include <iostream>
 
 class epicsShareClass CpscMotorAxis : public asynMotorAxis {
     public:
@@ -10,13 +13,14 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
         asynStatus move(double position, int relative, double min_velocity, double max_velocity, double acceleration);
         asynStatus poll(bool *moving);
         asynStatus setClosedLoop(bool closedLoop);
-        // asynStatus poll(bool *moving);
-
+        
     private:
         CpscMotorController *pC_;
         int axisIndex_;
         bool once;
         double mres;
+        bool fben; // feedback enabled
+
 
     friend class CpscMotorController;
 };

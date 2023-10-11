@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <math.h>
 #include <iostream>
 
@@ -15,9 +16,11 @@
 #include "cpsc_driver.hpp"
 #include "utils.hpp"
 using utils::Color;
+using utils::stylize_string;
 
-// readback is in meters with nanometer precision
-const long int PREC = 9; 
+// controller reports in meters with nanometer precision
+static const int PREC = 9; 
+static const long MULT = static_cast<long>(1 * pow(10, PREC));
 
 // ===================
 // CpscMotorController
@@ -46,7 +49,7 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     CpscMotorAxis *pAxis;
     static const char *functionName = "CpscMotorController::CpscMotorController";
     
-    // only feedback for 3 axes I think
+    // only feedback for 3 axes
     if (numAxes > 3) {
         asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Requested %d axes but 3 will be used", numAxes);
         numAxes = 3;
@@ -65,8 +68,6 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     for (axis = 0; axis < numAxes; axis++) {
         pAxis = new CpscMotorAxis(this, axis);
     }
-    
-    // additional controller (not axis specific) initialization:
 
     startPoller(movingPollPeriod, idlePollPeriod, 2);
 }
@@ -134,16 +135,21 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
 {
 
     axisIndex_ = axisNo + 1;
-    setDoubleParam(pC_->motorEncoderPosition_, 0.0);
-    setDoubleParam(pC_->motorPosition_, 0.0);
-    setDoubleParam(pC_->motorResolution_, 1.0);
+    // setDoubleParam(pC_->motorEncoderPosition_, 0.0);
+    // setDoubleParam(pC_->motorPosition_, 0.0);
 
     // enables setClosedLoop function:
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
     setIntegerParam(pC_->motorStatusGainSupport_, 1);
 
+    asynPrint(
+        pasynUser_,
+        ASYN_REASON_SIGNAL,
+        stylize_string("CpscMotorAxis created with axis index %d\n", Color::GREEN).c_str(),
+        axisIndex_
+    );
+
     once = true;
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "CpscMotorAxis created with axis index: %d\n", axisIndex_);
     callParamCallbacks();
     
 }
@@ -178,19 +184,22 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
     //       - 0 relative position (relative to current position)
     asynStatus status;
 
+    // pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &mres);
+    position = position / MULT; // convert to meters before sending
+
     // sets the setpoint for the current axis to "position" absolute
     // other axes are set to move 0.0 relative to their current position
     switch (axisIndex_) {
         case 1:
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %lf 1 0 0 0 0\n", position);
+            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %.9lf 1 0 0 0 0\n", position);
             // sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
             break;
         case 2: 
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %lf 1 0 0\n", position);
+            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %.9lf 1 0 0\n", position);
             // sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
             break;
         case 3: 
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %lf 1\n", position);
+            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %.9lf 1\n", position);
             // sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
             break;
         default:
@@ -203,10 +212,10 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
 
 asynStatus CpscMotorAxis::poll(bool *moving) {
     asynStatus asyn_status;
-    double position;
+    double position_m;
     int done;
     std::vector<double> status;
-    
+
     // Read position
     sprintf(pC_->outString_, "PGV 4 %d CBS10-RLS", axisIndex_);
     asyn_status = pC_->writeReadController();
@@ -222,9 +231,9 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     // MRES = 1e-3 -> micrometers
     // MRES = 1e-6 -> millimeters
     // MRES = 1e-9 -> meters
-    position = atof((const char *) &pC_->inString_);
-    long long_position = position * pow(10, PREC);
-    setDoubleParam(pC_->motorPosition_, long_position);
+    position_m = atof((const char *) &pC_->inString_);
+    long long_position_nm = MULT * position_m;
+    setDoubleParam(pC_->motorPosition_, long_position_nm); // RRBV [nanometers]
     
     // Read status 
     // [ENABLED] [FINISHED] [INVALID SP1] [INVALID SP2] [INVALID SP3] [POS ERROR1] [POS ERROR2] [POS ERROR3]
@@ -245,27 +254,42 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     setIntegerParam(pC_->motorStatusDone_, done);
     setIntegerParam(pC_->motorStatusMoving_, !done);
     *moving = !status.at(1);
-   
+
     // Handle error codes
     if (!status.at(0)) {
         if (once) {
             asynPrint(
                 pasynUser_,
                 ASYN_TRACE_ERROR,
-                utils::stylize_string("Error(%d): Feedback mode is disabled\n", Color::RED).c_str(),
+                stylize_string("Warning(Axis %d): Feedback mode is disabled\n", Color::YELLOW).c_str(),
                 axisIndex_
             );
             once = false;
         }
     }
     if (int(status.at(2)) == 1) {
-         asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 1\n");
+        asynPrint(
+            pasynUser_,
+            ASYN_TRACE_ERROR,
+            stylize_string("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(),
+            axisIndex_
+        );
     }
     if (int(status.at(3)) == 1) {
-         asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 2\n");
+        asynPrint(
+            pasynUser_,
+            ASYN_TRACE_ERROR,
+            stylize_string("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(),
+            axisIndex_
+        );
     }
     if (int(status.at(4)) == 1) {
-         asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 3\n");
+        asynPrint(
+            pasynUser_,
+            ASYN_TRACE_ERROR,
+            stylize_string("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(),
+            axisIndex_
+        );
     }
     
     // skip:
@@ -282,13 +306,23 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
     if (closedLoop) {
         // enable closed loop
         // add check for whether or not controller is already in closed loop mode
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Feedback mode enabled\r\n");
+        asynPrint(
+            pasynUser_,
+            ASYN_TRACE_ERROR,
+            "(Axis %d): Feedback mode enabled\n",
+            axisIndex_
+        );
         sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
 
     }
     else {
         // disable closed loop
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Feedback mode disabled\r\n");
+        asynPrint(
+            pasynUser_,
+            ASYN_TRACE_ERROR,
+            "(Axis %d): Feedback mode disabled\n",
+            axisIndex_
+        );
         sprintf(pC_->outString_, "FBXT");
     }
 

@@ -16,6 +16,7 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
         CpscMotorController *pC_;
         int axisIndex_;
         bool once;
+        double mres;
 
     friend class CpscMotorController;
 };

@@ -212,8 +212,9 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
 
 asynStatus CpscMotorAxis::poll(bool *moving) {
     asynStatus asyn_status;
-    double position_m;
-    int done;
+    double position_m = 0.0;
+    long long_position_nm = 0;
+    int done = 1;
     std::vector<double> status;
 
     // Read position
@@ -232,7 +233,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     // MRES = 1e-6 -> millimeters
     // MRES = 1e-9 -> meters
     position_m = atof((const char *) &pC_->inString_);
-    long long_position_nm = MULT * position_m;
+    long_position_nm = MULT * position_m;
     setDoubleParam(pC_->motorPosition_, long_position_nm); // RRBV [nanometers]
     
     // Read status 

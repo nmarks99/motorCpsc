@@ -250,11 +250,6 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     // split input char* by ',' into a std::vector<double>
     status = utils::split_char_arr(pC_->inString_, ',');
     
-    // get done status
-    done = status.at(1);
-    setIntegerParam(pC_->motorStatusDone_, done);
-    setIntegerParam(pC_->motorStatusMoving_, !done);
-    *moving = !status.at(1);
 
     // Handle error codes
     if (!status.at(0)) {
@@ -267,30 +262,42 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
             );
             once = false;
         }
+        done = 1;
+        setIntegerParam(pC_->motorStatusDone_, done);
+        setIntegerParam(pC_->motorStatusMoving_, !done);
+        *moving = 0;
     }
-    if (int(status.at(2)) == 1) {
-        asynPrint(
-            pasynUser_,
-            ASYN_TRACE_ERROR,
-            stylize_string("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(),
-            axisIndex_
-        );
-    }
-    if (int(status.at(3)) == 1) {
-        asynPrint(
-            pasynUser_,
-            ASYN_TRACE_ERROR,
-            stylize_string("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(),
-            axisIndex_
-        );
-    }
-    if (int(status.at(4)) == 1) {
-        asynPrint(
-            pasynUser_,
-            ASYN_TRACE_ERROR,
-            stylize_string("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(),
-            axisIndex_
-        );
+    else {
+        // get done status
+        done = status.at(1);
+        setIntegerParam(pC_->motorStatusDone_, done);
+        setIntegerParam(pC_->motorStatusMoving_, !done);
+        *moving = !status.at(1);
+
+        if (int(status.at(2)) == 1) {
+            asynPrint(
+                pasynUser_,
+                ASYN_TRACE_ERROR,
+                stylize_string("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(),
+                axisIndex_
+            );
+        }
+        if (int(status.at(3)) == 1) {
+            asynPrint(
+                pasynUser_,
+                ASYN_TRACE_ERROR,
+                stylize_string("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(),
+                axisIndex_
+            );
+        }
+        if (int(status.at(4)) == 1) {
+            asynPrint(
+                pasynUser_,
+                ASYN_TRACE_ERROR,
+                stylize_string("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(),
+                axisIndex_
+            );
+        }
     }
     
     // skip:

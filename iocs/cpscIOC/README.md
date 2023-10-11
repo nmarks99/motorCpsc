@@ -17,7 +17,7 @@ Adjust MRES to set the desired units for readback and commanded positions.
 | MRES   | EGUs    |
 |--------------- | --------------- |
 | 1.0   | nanometers   |
-| 1e-3   | micrometerse   |
+| 1e-3   | micrometers   |
 | 1e-6   | millimeters   |
 | 1e-9   | meters   |
 

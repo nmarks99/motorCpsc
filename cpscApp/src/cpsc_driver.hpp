@@ -1,7 +1,6 @@
 #include "asynDriver.h"
 #include "asynMotorController.h"
 #include "asynMotorAxis.h"
-#include "utils.hpp"
 #include <iostream>
 
 class epicsShareClass CpscMotorAxis : public asynMotorAxis {

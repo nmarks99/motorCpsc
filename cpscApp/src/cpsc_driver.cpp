@@ -13,19 +13,21 @@
 #include <epicsExport.h>
 
 #include "cpsc_driver.hpp"
-// #include "utils.hpp"
+#include "utils.hpp"
 using utils::Color;
 using utils::stylize_string;
 
-// controller reports in meters with nanometer precision
-static const int PREC = 9; 
-static const long MULT = static_cast<long>(1 * pow(10, PREC));
+constexpr int PREC = 9; // controller reports in meters with nanometer precision
+constexpr double LOW_LIMIT = -0.004802360; // meters (for axis 1 only?)
+constexpr double HIGH_LIMIT = 0.004802361; // meters (for axis 1 only?)
+const long MULT = static_cast<long>(1 * pow(10, PREC));
+
 
 // ===================
 // CpscMotorController
 // ===================
 
-static const int NUM_PARAMS = 0;
+constexpr int NUM_PARAMS = 0;
 
 /// \brief Create a new CpscMotorController object
 ///
@@ -134,12 +136,17 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
 {
 
     axisIndex_ = axisNo + 1;
-    once = true;
-    fben = false;
+    this->once = true;
+    this->fben = false; // will be updated from poll method
 
     // enables setClosedLoop function:
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
     setIntegerParam(pC_->motorStatusGainSupport_, 1);
+
+    // get MRES and set limits (not working?)
+    pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
+    setDoubleParam(pC_->motorLowLimit_, LOW_LIMIT/mres);
+    setDoubleParam(pC_->motorHighLimit_, HIGH_LIMIT/mres);
 
     asynPrint(
         pasynUser_,
@@ -189,8 +196,9 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
     //       - 0 relative position (relative to current position)
     asynStatus status;
     
+    // Only allowing closed-loop motion from EPICS for now.
+    // Use MOV commands directly if open-loop motion is needed.
     if (fben) {
-        // pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &mres);
         position = position / MULT; // convert to meters before sending
 
         // sets the setpoint for the current axis to "position" absolute
@@ -213,11 +221,9 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
         }
     }
     else {
-        asynPrint(
-            pasynUser_,
-            ASYN_TRACE_ERROR,
-            stylize_string("Warning(Axis %d): Feedback mode is disabled\n", Color::YELLOW).c_str(),
-            axisIndex_
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
+                  stylize_string("Warning(Axis %d): Move aborted. Feedback mode is disabled\n", Color::YELLOW).c_str(),
+                  axisIndex_
         );
     }
     // status = pC_->writeReadController();
@@ -236,7 +242,8 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     sprintf(pC_->outString_, "PGV 4 %d CBS10-RLS", axisIndex_);
     asyn_status = pC_->writeReadController();
     if (asyn_status) {
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error reading position\n");
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
+                  stylize_string("Error(Axis %d): read position failed\n", Color::RED).c_str(), axisIndex_);
         setIntegerParam(pC_->motorStatusProblem_, asyn_status);
         callParamCallbacks();
         return asyn_status ? asynError : asynSuccess;
@@ -265,7 +272,8 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     sprintf(pC_->outString_, "FBST");
     asyn_status = pC_->writeReadController();
     if (asyn_status) {
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error reading status\n");
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
+                  stylize_string("Error(Axis %d): read status failed\n", Color::RED).c_str(), axisIndex_);
         setIntegerParam(pC_->motorStatusProblem_, asyn_status);
         callParamCallbacks();
         return asyn_status ? asynError : asynSuccess;
@@ -299,33 +307,21 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
         *moving = !status.at(1);
 
         if (status.at(FBStatus::INVALID_SP1)) {
-            asynPrint(
-                pasynUser_,
-                ASYN_TRACE_ERROR,
-                stylize_string("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(),
-                axisIndex_
-            );
+            asynPrint(pasynUser_, ASYN_TRACE_ERROR,
+                      stylize_string("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(),axisIndex_);
         }
         if (status.at(FBStatus::INVALID_SP2)) {
-            asynPrint(
-                pasynUser_,
-                ASYN_TRACE_ERROR,
-                stylize_string("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(),
-                axisIndex_
-            );
+            asynPrint(pasynUser_, ASYN_TRACE_ERROR,
+                      stylize_string("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(),axisIndex_);
         }
         if (status.at(FBStatus::INVALID_SP3)) {
-            asynPrint(
-                pasynUser_,
-                ASYN_TRACE_ERROR,
-                stylize_string("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(),
-                axisIndex_
-            );
+            asynPrint(pasynUser_,ASYN_TRACE_ERROR,
+                      stylize_string("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(),axisIndex_);
         }
     }
     
     // skip:
-    setIntegerParam(pC_->motorStatusProblem_, asyn_status);
+    setIntegerParam(pC_->motorStatusProblem_, asyn_status ? 1 : 0);
     callParamCallbacks();
     return asyn_status ? asynError : asynSuccess;
 }
@@ -337,24 +333,12 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
 
     if (closedLoop) {
         // enable closed loop
-        // add check for whether or not controller is already in closed loop mode
-        asynPrint(
-            pasynUser_,
-            ASYN_TRACE_ERROR,
-            "(Axis %d): Feedback mode enabled\n",
-            axisIndex_
-        );
+        asynPrint(pasynUser_,ASYN_TRACE_ERROR, "(Axis %d): Feedback mode enabled\n",axisIndex_);
         sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
-
     }
     else {
         // disable closed loop
-        asynPrint(
-            pasynUser_,
-            ASYN_TRACE_ERROR,
-            "(Axis %d): Feedback mode disabled\n",
-            axisIndex_
-        );
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "(Axis %d): Feedback mode disabled\n", axisIndex_);
         sprintf(pC_->outString_, "FBXT");
     }
 

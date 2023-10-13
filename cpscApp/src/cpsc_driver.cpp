@@ -17,10 +17,11 @@
 using utils::Color;
 using utils::stylize_string;
 
-constexpr int PREC = 9; // controller reports in meters with nanometer precision
-constexpr double LOW_LIMIT = -0.004802360; // meters (for axis 1 only?)
-constexpr double HIGH_LIMIT = 0.004802361; // meters (for axis 1 only?)
-const long MULT = static_cast<long>(1 * pow(10, PREC));
+// constexpr int PREC = 9; // controller reports in meters with nanometer precision
+// const long MULT = static_cast<long>(1 * pow(10, PREC));
+constexpr long MULT = 1000000000; // controller reports in meters with nanometer precision
+constexpr double LOW_LIMIT = -4802360.0; // meters (for axis 1 only?)
+constexpr double HIGH_LIMIT = 4802361.0; // meters (for axis 1 only?)
 
 
 // ===================
@@ -143,11 +144,6 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
     setIntegerParam(pC_->motorStatusGainSupport_, 1);
 
-    // get MRES and set limits (not working?)
-    pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
-    setDoubleParam(pC_->motorLowLimit_, LOW_LIMIT/mres);
-    setDoubleParam(pC_->motorHighLimit_, HIGH_LIMIT/mres);
-
     asynPrint(
         pasynUser_,
         ASYN_REASON_SIGNAL,
@@ -206,15 +202,15 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
         switch (axisIndex_) {
             case 1:
                 asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %.9lf 1 0 0 0 0\n", position);
-                // sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
+                sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
                 break;
             case 2: 
                 asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %.9lf 1 0 0\n", position);
-                // sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
+                sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
                 break;
             case 3: 
                 asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %.9lf 1\n", position);
-                // sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
+                sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
                 break;
             default:
                 asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
@@ -226,7 +222,7 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
                   axisIndex_
         );
     }
-    // status = pC_->writeReadController();
+    status = pC_->writeReadController();
     return status;
 }
 
@@ -237,6 +233,18 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     long long_position_nm = 0;
     int done = 1;
     std::vector<double> status;
+
+
+    pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
+    // setDoubleParam(pC_->motorLowLimit_, LOW_LIMIT/mres);
+    // setDoubleParam(pC_->motorHighLimit_, HIGH_LIMIT/mres);
+    
+    // double motor_high_limit = 0.0;
+    // double motor_low_limit = 0.0;
+    // pC_->getDoubleParam(axisNo_, pC_->motorHighLimit_, &motor_high_limit);
+    // pC_->getDoubleParam(axisNo_, pC_->motorLowLimit_, &motor_low_limit);
+    // std::cout << "high = " << motor_high_limit << std::endl;
+    // std::cout << "low = " << motor_low_limit << std::endl;
 
     // Read position
     sprintf(pC_->outString_, "PGV 4 %d CBS10-RLS", axisIndex_);

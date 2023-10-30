@@ -17,11 +17,9 @@
 using utils::Color;
 using utils::stylize_string;
 
-// constexpr int PREC = 9; // controller reports in meters with nanometer precision
-// const long MULT = static_cast<long>(1 * pow(10, PREC));
 constexpr long MULT = 1000000000; // controller reports in meters with nanometer precision
-constexpr double LOW_LIMIT = -4802360.0; // meters (for axis 1 only?)
-constexpr double HIGH_LIMIT = 4802361.0; // meters (for axis 1 only?)
+constexpr double LOW_LIMIT = -4802360.0; // nanometers (for axis 1 only?)
+constexpr double HIGH_LIMIT = 4802361.0; // nanometers (for axis 1 only?)
 
 
 // ===================
@@ -234,7 +232,6 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     int done = 1;
     std::vector<double> status;
 
-
     pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
     // setDoubleParam(pC_->motorLowLimit_, LOW_LIMIT/mres);
     // setDoubleParam(pC_->motorHighLimit_, HIGH_LIMIT/mres);
@@ -247,6 +244,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     // std::cout << "low = " << motor_low_limit << std::endl;
 
     // Read position
+    // TODO: should be CS021-RLS.X, CS021-RLS.Y, or CS021-RLS.Z
     sprintf(pC_->outString_, "PGV 4 %d CBS10-RLS", axisIndex_);
     asyn_status = pC_->writeReadController();
     if (asyn_status) {
@@ -276,6 +274,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
         POS_ERROR2 = 6,
         POS_ERROR3 = 7
     };
+
     // Read status 
     sprintf(pC_->outString_, "FBST");
     asyn_status = pC_->writeReadController();
@@ -291,7 +290,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     status = utils::split_char_arr(pC_->inString_, ',');
 
     // Handle error codes
-    if (not status.at(ENABLED)) {
+    if (not status.at(FBStatus::ENABLED)) {
         if (once) {
             asynPrint(
                 pasynUser_,
@@ -342,7 +341,7 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
     if (closedLoop) {
         // enable closed loop
         asynPrint(pasynUser_,ASYN_TRACE_ERROR, "(Axis %d): Feedback mode enabled\n",axisIndex_);
-        sprintf(pC_->outString_, "FBEN CBS10-RLS 300 CBS10-RLS 300 CBS10-RLS 300 1 293");
+        sprintf(pC_->outString_, "FBEN CS021-RLS.X 600 CS021-RLS.Y 600 CS021-RLS.Z 600 1 293");
     }
     else {
         // disable closed loop

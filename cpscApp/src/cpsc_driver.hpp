@@ -12,6 +12,7 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
         asynStatus move(double position, int relative, double min_velocity, double max_velocity, double acceleration);
         asynStatus poll(bool *moving);
         asynStatus setClosedLoop(bool closedLoop);
+        asynStatus home(double minVelocity, double maxVelocity, double acceleration, int forwards);
         
     private:
         CpscMotorController *pC_;

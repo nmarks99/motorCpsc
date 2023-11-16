@@ -18,7 +18,7 @@ namespace utils {
     
     /// \brief Adds ANSI escape codes to a string to enable
     /// it to be displayed in color when written to the console
-    std::string stylize_string(std::string s, Color color);
+    std::string stylize(std::string s, Color color);
     
     /// \brief splits a char array into a std::vector<double>
     /// Copies char* to std::string, replaces delimiter with spaces,

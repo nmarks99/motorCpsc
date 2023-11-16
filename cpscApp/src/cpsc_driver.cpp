@@ -15,7 +15,7 @@
 #include "cpsc_driver.hpp"
 #include "utils.hpp"
 using utils::Color;
-using utils::stylize_string;
+using utils::stylize;
 
 constexpr long MULT = 1000000000; // controller reports in meters with nanometer precision
 constexpr double LOW_LIMIT = -4802360.0; // nanometers (for axis 1 only?)
@@ -145,7 +145,7 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
     asynPrint(
         pasynUser_,
         ASYN_REASON_SIGNAL,
-        stylize_string("CpscMotorAxis created with axis index %d\n", Color::GREEN).c_str(),
+        stylize("CpscMotorAxis created with axis index %d\n", Color::GREEN).c_str(),
         axisIndex_
     );
 
@@ -216,10 +216,30 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
     }
     else {
         asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                  stylize_string("Warning(Axis %d): Move aborted. Feedback mode is disabled\n", Color::YELLOW).c_str(),
+                  stylize("Warning(Axis %d): Move aborted. Feedback mode is disabled\n", Color::YELLOW).c_str(),
                   axisIndex_
         );
     }
+    status = pC_->writeReadController();
+    return status;
+}
+
+/// \brief home the axis (move to absolute zero)
+/// Note: will abort and do nothing if not in feedback mode
+asynStatus CpscMotorAxis::home(double minVelocity, double maxVelocity, double acceleration, int forwards) {
+    asynStatus status;
+    
+    if (fben) {
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "(Axis %d): Homing...\n", axisIndex_);
+        sprintf(pC_->outString_, "FBCS 0.0 1 0.0 1 0.0 1");
+    }
+    else {
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
+                  stylize("Warning(Axis %d): Move aborted. Feedback mode is disabled\n", Color::YELLOW).c_str(),
+                  axisIndex_
+        );
+    }
+
     status = pC_->writeReadController();
     return status;
 }
@@ -249,7 +269,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     asyn_status = pC_->writeReadController();
     if (asyn_status) {
         asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                  stylize_string("Error(Axis %d): read position failed\n", Color::RED).c_str(), axisIndex_);
+                  stylize("Error(Axis %d): read position failed\n", Color::RED).c_str(), axisIndex_);
         setIntegerParam(pC_->motorStatusProblem_, asyn_status);
         callParamCallbacks();
         return asyn_status ? asynError : asynSuccess;
@@ -280,7 +300,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     asyn_status = pC_->writeReadController();
     if (asyn_status) {
         asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                  stylize_string("Error(Axis %d): read status failed\n", Color::RED).c_str(), axisIndex_);
+                  stylize("Error(Axis %d): read status failed\n", Color::RED).c_str(), axisIndex_);
         setIntegerParam(pC_->motorStatusProblem_, asyn_status);
         callParamCallbacks();
         return asyn_status ? asynError : asynSuccess;
@@ -295,7 +315,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
             asynPrint(
                 pasynUser_,
                 ASYN_TRACE_ERROR,
-                stylize_string("Warning(Axis %d): Feedback mode is disabled\n", Color::YELLOW).c_str(),
+                stylize("Warning(Axis %d): Feedback mode is disabled\n", Color::YELLOW).c_str(),
                 axisIndex_
             );
             once = false;
@@ -315,15 +335,15 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
 
         if (status.at(FBStatus::INVALID_SP1)) {
             asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                      stylize_string("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(),axisIndex_);
+                      stylize("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(),axisIndex_);
         }
         if (status.at(FBStatus::INVALID_SP2)) {
             asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                      stylize_string("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(),axisIndex_);
+                      stylize("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(),axisIndex_);
         }
         if (status.at(FBStatus::INVALID_SP3)) {
             asynPrint(pasynUser_,ASYN_TRACE_ERROR,
-                      stylize_string("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(),axisIndex_);
+                      stylize("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(),axisIndex_);
         }
     }
     

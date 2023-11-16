@@ -2,7 +2,7 @@
 
 namespace utils {
 
-    std::string stylize_string(std::string s, Color color) {
+    std::string stylize(std::string s, Color color) {
         std::map<Color, std::string> color_map = {
             {RED, "\x1b[31m"},
             {GREEN, "\x1B[32m"},

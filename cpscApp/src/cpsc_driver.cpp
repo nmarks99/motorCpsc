@@ -251,32 +251,18 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     long long_position_nm = 0;
     int done = 1;
     std::vector<double> status;
-
     pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
-    // setDoubleParam(pC_->motorLowLimit_, LOW_LIMIT/mres);
-    // setDoubleParam(pC_->motorHighLimit_, HIGH_LIMIT/mres);
     
-    // double motor_high_limit = 0.0;
-    // double motor_low_limit = 0.0;
-    // pC_->getDoubleParam(axisNo_, pC_->motorHighLimit_, &motor_high_limit);
-    // pC_->getDoubleParam(axisNo_, pC_->motorLowLimit_, &motor_low_limit);
-    // std::cout << "high = " << motor_high_limit << std::endl;
-    // std::cout << "low = " << motor_low_limit << std::endl;
-
     // Read position
     // TODO: should be CS021-RLS.X, CS021-RLS.Y, or CS021-RLS.Z
     sprintf(pC_->outString_, "PGV 4 %d CBS10-RLS", axisIndex_);
     asyn_status = pC_->writeReadController();
     if (asyn_status) {
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                  stylize("Error(Axis %d): read position failed\n", Color::RED).c_str(), axisIndex_);
-        setIntegerParam(pC_->motorStatusProblem_, asyn_status);
-        callParamCallbacks();
-        return asyn_status ? asynError : asynSuccess;
+        goto skip;
     }
 
     // Adjust MRES to obtain the desired units of the readback values
-    // MRES = 1.0 -> nanometers
+    // MRES = 1.0  -> nanometers
     // MRES = 1e-3 -> micrometers
     // MRES = 1e-6 -> millimeters
     // MRES = 1e-9 -> meters
@@ -284,6 +270,17 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     long_position_nm = MULT * position_m;
     setDoubleParam(pC_->motorPosition_, long_position_nm); // RRBV [nanometers]
     
+    // Read status 
+    sprintf(pC_->outString_, "FBST");
+    asyn_status = pC_->writeReadController();
+    if (asyn_status) {
+        goto skip;
+    }
+
+    // split input char* by ',' into a std::vector<double>
+    status = utils::split_char_arr(pC_->inString_, ',');
+
+    // Status indices
     enum FBStatus {
         ENABLED = 0,
         DONE = 1,
@@ -294,20 +291,6 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
         POS_ERROR2 = 6,
         POS_ERROR3 = 7
     };
-
-    // Read status 
-    sprintf(pC_->outString_, "FBST");
-    asyn_status = pC_->writeReadController();
-    if (asyn_status) {
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                  stylize("Error(Axis %d): read status failed\n", Color::RED).c_str(), axisIndex_);
-        setIntegerParam(pC_->motorStatusProblem_, asyn_status);
-        callParamCallbacks();
-        return asyn_status ? asynError : asynSuccess;
-    }
-
-    // split input char* by ',' into a std::vector<double>
-    status = utils::split_char_arr(pC_->inString_, ',');
 
     // Handle error codes
     if (not status.at(FBStatus::ENABLED)) {
@@ -335,22 +318,22 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
 
         if (status.at(FBStatus::INVALID_SP1)) {
             asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                      stylize("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(),axisIndex_);
+                      stylize("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(), axisIndex_);
         }
         if (status.at(FBStatus::INVALID_SP2)) {
             asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                      stylize("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(),axisIndex_);
+                      stylize("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(), axisIndex_);
         }
         if (status.at(FBStatus::INVALID_SP3)) {
             asynPrint(pasynUser_,ASYN_TRACE_ERROR,
-                      stylize("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(),axisIndex_);
+                      stylize("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(), axisIndex_);
         }
     }
     
-    // skip:
-    setIntegerParam(pC_->motorStatusProblem_, asyn_status ? 1 : 0);
-    callParamCallbacks();
-    return asyn_status ? asynError : asynSuccess;
+    skip:
+        setIntegerParam(pC_->motorStatusProblem_, asyn_status ? 1 : 0);
+        callParamCallbacks();
+        return asyn_status ? asynError : asynSuccess;
 }
 
 

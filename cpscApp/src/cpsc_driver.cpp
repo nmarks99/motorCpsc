@@ -254,8 +254,12 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
     
     // Read position
-    // TODO: should be CS021-RLS.X, CS021-RLS.Y, or CS021-RLS.Z
-    sprintf(pC_->outString_, "PGV 4 %d CBS10-RLS", axisIndex_);
+    std::map<int, std::string> axis_map = {
+        {1, "CS021-RLS.X"},
+        {2, "CS021-RLS.Y"},
+        {3, "CS021-RLS.Z"}
+    };
+    sprintf(pC_->outString_, "PGV 4 %d %s", axisIndex_, axis_map[axisIndex_].c_str());
     asyn_status = pC_->writeReadController();
     if (asyn_status) {
         goto skip;

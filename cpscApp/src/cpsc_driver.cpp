@@ -197,22 +197,29 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
 
         // sets the setpoint for the current axis to "position" absolute
         // other axes are set to move 0.0 relative to their current position
-        switch (axisIndex_) {
-            case 1:
-                asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %.9lf 1 0 0 0 0\n", position);
-                sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
-                break;
-            case 2: 
-                asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %.9lf 1 0 0\n", position);
-                sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
-                break;
-            case 3: 
-                asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %.9lf 1\n", position);
-                sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
-                break;
-            default:
-                asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
-        }
+        std::map<int, const char*> axis_map = {
+            {1, "FBCS %lf 1 0 0 0 0"},
+            {2, "FBCS 0 0 %lf 1 0 0"},
+            {3, "FBCS 0 0 0 0 %lf 1"},
+        };
+        sprintf(pC_->outString_, "%s", axis_map[axisIndex_]);
+
+        // switch (axisIndex_) {
+        //     case 1:
+        //         asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %.9lf 1 0 0 0 0\n", position);
+        //         sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
+        //         break;
+        //     case 2: 
+        //         asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %.9lf 1 0 0\n", position);
+        //         sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
+        //         break;
+        //     case 3: 
+        //         asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %.9lf 1\n", position);
+        //         sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
+        //         break;
+        //     default:
+        //         asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
+        // }
     }
     else {
         asynPrint(pasynUser_, ASYN_TRACE_ERROR,
@@ -229,9 +236,14 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
 asynStatus CpscMotorAxis::home(double minVelocity, double maxVelocity, double acceleration, int forwards) {
     asynStatus status;
     
+    std::map<int, const char*> axis_map = {
+        {1, "FBCS 0.0 1 0.0 0 0.0 0"},
+        {2, "FBCS 0.0 0 0.0 1 0.0 0"},
+        {3, "FBCS 0.0 0 0.0 0 0.0 1"},
+    };
     if (fben) {
         asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "(Axis %d): Homing...\n", axisIndex_);
-        sprintf(pC_->outString_, "FBCS 0.0 1 0.0 1 0.0 1");
+        sprintf(pC_->outString_, "%s", axis_map[axisIndex_]);
     }
     else {
         asynPrint(pasynUser_, ASYN_TRACE_ERROR,

@@ -202,6 +202,13 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
             {2, "FBCS 0 0 %lf 1 0 0"},
             {3, "FBCS 0 0 0 0 %lf 1"},
         };
+
+        std::map<int, const char*> axis_map2 = {
+            {1, "FBCS %.9lf 1 0 0 0 0"},
+            {2, "FBCS 0 0 %.9lf 1 0 0"},
+            {3, "FBCS 0 0 0 0 %.9lf 1"},
+        };
+        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "%s\n", axis_map2[axisIndex_]);
         sprintf(pC_->outString_, "%s", axis_map[axisIndex_]);
 
         // switch (axisIndex_) {

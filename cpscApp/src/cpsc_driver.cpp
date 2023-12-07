@@ -1,6 +1,3 @@
-#include <iomanip>
-#include <math.h>
-
 #include <iocsh.h>
 #include <epicsThread.h>
 
@@ -14,6 +11,7 @@
 
 #include "cpsc_driver.hpp"
 #include "utils.hpp"
+
 using utils::Color;
 using utils::stylize;
 
@@ -48,6 +46,9 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     int axis;
     CpscMotorAxis *pAxis;
     static const char *functionName = "CpscMotorController::CpscMotorController";
+
+    createParam(CpscTemperatureXString, asynParamInt32, &CpscTemperatureX_);
+    createParam(CpscFrequencyXString, asynParamInt32, &CpscFrequencyX_);
     
     // only feedback for 3 axes
     if (numAxes > 3) {

@@ -1,7 +1,9 @@
 #include "asynDriver.h"
 #include "asynMotorController.h"
 #include "asynMotorAxis.h"
-#include <iostream>
+
+static constexpr char CpscTemperatureXString[] = "CPSC_TEMPERATURE_X";
+static constexpr char CpscFrequencyXString[] = "CPSC_FREQUENCY_X";
 
 class epicsShareClass CpscMotorAxis : public asynMotorAxis {
     public:
@@ -20,8 +22,7 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
         bool once;
         double mres;
         bool fben; // feedback enabled
-
-
+    
     friend class CpscMotorController;
 };
 
@@ -34,5 +35,10 @@ class epicsShareClass CpscMotorController : public asynMotorController {
         CpscMotorAxis* getAxis(asynUser *pasynUser);
         CpscMotorAxis* getAxis(int axisNo);
 
+    protected:
+        int CpscTemperatureX_;
+        int CpscFrequencyX_;
+
     friend class CpscMotorAxis;
+
 };

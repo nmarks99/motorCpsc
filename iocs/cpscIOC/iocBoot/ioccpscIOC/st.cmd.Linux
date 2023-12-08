@@ -41,6 +41,8 @@ dbLoadTemplate("substitutions/asyn_motor.substitutions", "P=$(PREFIX)")
 # load asyn record
 dbLoadRecords("$(ASYN)/db/asynRecord.db", "P=$(PREFIX), R=asyn_1, PORT=$(PORT_NAME), ADDR=0, OMAX=$(OUT_BUFF=1000), IMAX=$(IN_BUFF=1000)")
 
+dbLoadRecords("$(TOP)/../../db/CPSCParams.db", "P=$(PREFIX), PORT=$(PORT_NAME), ADDR=1")
+
 # Create a controller with axes
 CpscMotorCreateController("CPSC1", "$(PORT_NAME)", 3, 250, 1000)
 

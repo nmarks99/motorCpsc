@@ -1,0 +1,17 @@
+record(longout, "$(P)TemperatureX")
+{
+    field(DESC, "X axis temperature")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR))CPSC_TEMPERATURE_X")
+    field(VAL,  300)
+    field(PINI, "YES")
+}
+
+record(longout, "$(P)FrequencyX")
+{
+    field(DESC, "X axis frequency")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR))CPSC_FREQUENCY_X")
+    field(VAL,  600)
+    field(PINI, "YES")
+}

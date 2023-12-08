@@ -22,6 +22,8 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
         bool once;
         double mres;
         bool fben; // feedback enabled
+        int temperature;
+        int frequency;
     
     friend class CpscMotorController;
 };

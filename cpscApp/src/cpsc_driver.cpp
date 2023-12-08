@@ -1,5 +1,6 @@
 #include <iocsh.h>
 #include <epicsThread.h>
+#include <iostream>
 
 #include <asynOctetSyncIO.h>
 
@@ -151,7 +152,6 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
     );
 
     callParamCallbacks();
-    
 }
 
 /// \brief Report on the axis
@@ -257,7 +257,22 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     long long_position_nm = 0;
     int done = 1;
     std::vector<double> status;
-    pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
+    // pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
+
+    pC_->getIntegerParam(axisNo_, pC_->CpscTemperatureX_, &this->temperature);
+    pC_->getIntegerParam(axisNo_, pC_->CpscFrequencyX_, &this->frequency);
+    asynPrint(
+        pasynUser_,
+        ASYN_REASON_SIGNAL,
+        stylize("TemperatureX = %d\n", Color::YELLOW).c_str(),
+        this->temperature
+    );
+    asynPrint(
+        pasynUser_,
+        ASYN_REASON_SIGNAL,
+        stylize("FrequencyX = %d\n", Color::YELLOW).c_str(),
+        this->frequency
+    );   
     
     // Read position
     std::map<int, std::string> axis_map = {

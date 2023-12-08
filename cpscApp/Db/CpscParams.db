@@ -1,8 +1,0 @@
-record(longout, "$(P)FrequencyX")
-{
-    field(DESC, "X axis frequency")
-    field(DTYP, "asynInt32")
-    field(OUT,  "@asyn($(PORT),$(ADDR))CPSC_FREQUENCY_X")
-    field(VAL,  600)
-    field(PINI, "YES")
-}

@@ -1,6 +1,5 @@
 #include <iocsh.h>
 #include <epicsThread.h>
-#include <iostream>
 
 #include <asynOctetSyncIO.h>
 
@@ -47,9 +46,9 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     int axis;
     CpscMotorAxis *pAxis;
     static const char *functionName = "CpscMotorController::CpscMotorController";
-
-    createParam(CpscTemperatureXString, asynParamInt32, &CpscTemperatureX_);
-    createParam(CpscFrequencyXString, asynParamInt32, &CpscFrequencyX_);
+    
+    createParam(CpscFrequencyXString, asynParamFloat64, &CpscFrequencyX_);
+    createParam(CpscTemperatureXString, asynParamFloat64, &CpscTemperatureX_);
     
     // only feedback for 3 axes
     if (numAxes > 3) {
@@ -257,23 +256,14 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     long long_position_nm = 0;
     int done = 1;
     std::vector<double> status;
-    // pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
-
-    pC_->getIntegerParam(axisNo_, pC_->CpscTemperatureX_, &this->temperature);
-    pC_->getIntegerParam(axisNo_, pC_->CpscFrequencyX_, &this->frequency);
-    asynPrint(
-        pasynUser_,
-        ASYN_REASON_SIGNAL,
-        stylize("TemperatureX = %d\n", Color::YELLOW).c_str(),
-        this->temperature
-    );
-    asynPrint(
-        pasynUser_,
-        ASYN_REASON_SIGNAL,
-        stylize("FrequencyX = %d\n", Color::YELLOW).c_str(),
-        this->frequency
-    );   
+    pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
     
+    // Get the frequency and temperature values (should be in move function only?)
+    pC_->getDoubleParam(pC_->CpscFrequencyX_, &this->frequency);
+    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "frequency = %lf\n", this->frequency);
+    pC_->getDoubleParam(pC_->CpscTemperatureX_, &this->temperature);
+    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "temperature = %lf\n\n", this->temperature);
+
     // Read position
     std::map<int, std::string> axis_map = {
         {1, "CS021-RLS.X"},

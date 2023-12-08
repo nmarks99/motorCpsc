@@ -47,8 +47,8 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     CpscMotorAxis *pAxis;
     static const char *functionName = "CpscMotorController::CpscMotorController";
     
-    createParam(CpscFrequencyXString, asynParamFloat64, &CpscFrequencyX_);
-    createParam(CpscTemperatureXString, asynParamFloat64, &CpscTemperatureX_);
+    createParam(CpscFrequencyXString, asynParamInt32, &CpscFrequencyX_);
+    createParam(CpscTemperatureXString, asynParamInt32, &CpscTemperatureX_);
     
     // only feedback for 3 axes
     if (numAxes > 3) {
@@ -259,10 +259,10 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
     
     // Get the frequency and temperature values (should be in move function only?)
-    pC_->getDoubleParam(pC_->CpscFrequencyX_, &this->frequency);
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "frequency = %lf\n", this->frequency);
-    pC_->getDoubleParam(pC_->CpscTemperatureX_, &this->temperature);
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "temperature = %lf\n\n", this->temperature);
+    pC_->getIntegerParam(pC_->CpscFrequencyX_, &this->frequency);
+    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "frequency = %d\n", this->frequency);
+    pC_->getIntegerParam(pC_->CpscTemperatureX_, &this->temperature);
+    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "temperature = %d\n\n", this->temperature);
 
     // Read position
     std::map<int, std::string> axis_map = {

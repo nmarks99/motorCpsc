@@ -33,3 +33,14 @@ record(ao, "$(P)FrequencyZ")
     field(VAL,  600)
     field(PINI, "YES")
 }
+
+record(ao, "$(P)DriveFactor")
+{
+    field(DESC, "Drive factor")
+    field(DTYP, "asynFloat64")
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_DRIVE_FACTOR")
+    field(DRVH, "3.0")
+    field(DRVL, "0.1")
+    field(VAL,  1.0)
+    field(PINI, "YES")
+}

@@ -52,6 +52,7 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     createParam(CpscFrequencyYString, asynParamInt32, &CpscFrequencyY_);
     createParam(CpscFrequencyZString, asynParamInt32, &CpscFrequencyZ_);
     createParam(CpscTemperatureString, asynParamInt32, &CpscTemperature_);
+    createParam(CpscDriveFactorString, asynParamFloat64, &CpscDriveFactor_);
 
     if (numAxes > 3) {
         asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Requested %d axes but 3 will be used", numAxes);
@@ -359,11 +360,18 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
             pC_->getIntegerParam(pC_->CpscFrequencyY_, &pC_->frequencyY);
             pC_->getIntegerParam(pC_->CpscFrequencyZ_, &pC_->frequencyZ);
             pC_->getIntegerParam(pC_->CpscTemperature_, &pC_->temperature);
+            pC_->getDoubleParam(pC_->CpscDriveFactor_, &pC_->drive_factor);
         
             // enable closed loop
             asynPrint(pasynUser_,ASYN_TRACE_ERROR, "Enabling feedback mode...\n");
-            asynPrint(pasynUser_,ASYN_TRACE_ERROR, "FBEN CS021-RLS.X %d CS021-RLS.Y %d CS021-RLS.Z %d 1 %d\n", pC_->frequencyX, pC_->frequencyY, pC_->frequencyZ, pC_->temperature);
-            sprintf(pC_->outString_, "FBEN CS021-RLS.X 600 CS021-RLS.Y 600 CS021-RLS.Z 600 1 293");
+            asynPrint(pasynUser_,
+                      ASYN_REASON_SIGNAL,
+                      "FBEN CS021-RLS.X %d CS021-RLS.Y %d CS021-RLS.Z %d %lf %d\n",
+                      pC_->frequencyX, pC_->frequencyY, pC_->frequencyZ, pC_->drive_factor, pC_->temperature);
+
+            sprintf(pC_->outString_, "FBEN CS021-RLS.X %d CS021-RLS.Y %d CS021-RLS.Z %d %lf %d\n",
+                      pC_->frequencyX, pC_->frequencyY, pC_->frequencyZ, pC_->drive_factor, pC_->temperature);
+            // sprintf(pC_->outString_, "FBEN CS021-RLS.X 600 CS021-RLS.Y 600 CS021-RLS.Z 600 1 293");
         }
         else {
             asynPrint(pasynUser_,ASYN_TRACE_ERROR, "Feedback mode already enabled\n");

@@ -1,9 +1,9 @@
-record(ao, "$(P)TemperatureX")
+record(ao, "$(P)Temperature")
 {
-    field(DESC, "X axis temperature")
+    field(DESC, "Temperature")
     field(DTYP, "asynInt32")
-    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_TEMPERATURE_X")
-    field(VAL,  300)
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_TEMPERATURE")
+    field(VAL,  293)
     field(PINI, "YES")
 }
 
@@ -12,6 +12,24 @@ record(ao, "$(P)FrequencyX")
     field(DESC, "X axis frequency")
     field(DTYP, "asynInt32")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_FREQUENCY_X")
+    field(VAL,  600)
+    field(PINI, "YES")
+}
+
+record(ao, "$(P)FrequencyY")
+{
+    field(DESC, "Y axis frequency")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_FREQUENCY_Y")
+    field(VAL,  600)
+    field(PINI, "YES")
+}
+
+record(ao, "$(P)FrequencyZ")
+{
+    field(DESC, "Z axis frequency")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_FREQUENCY_Z")
     field(VAL,  600)
     field(PINI, "YES")
 }

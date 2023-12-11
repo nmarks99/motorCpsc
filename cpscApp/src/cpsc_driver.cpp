@@ -46,11 +46,13 @@ CpscMotorController::CpscMotorController(const char *portName, const char *CpscM
     int axis;
     CpscMotorAxis *pAxis;
     static const char *functionName = "CpscMotorController::CpscMotorController";
-    
+ 
+    // Create additional parameters for user. See JPE CPSC software user manual
     createParam(CpscFrequencyXString, asynParamInt32, &CpscFrequencyX_);
-    createParam(CpscTemperatureXString, asynParamInt32, &CpscTemperatureX_);
-    
-    // only feedback for 3 axes
+    createParam(CpscFrequencyYString, asynParamInt32, &CpscFrequencyY_);
+    createParam(CpscFrequencyZString, asynParamInt32, &CpscFrequencyZ_);
+    createParam(CpscTemperatureString, asynParamInt32, &CpscTemperature_);
+
     if (numAxes > 3) {
         asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Requested %d axes but 3 will be used", numAxes);
         numAxes = 3;
@@ -139,7 +141,7 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController *pC, int axisNo) : asynMotorAxi
     this->once = true;
     this->fben = false; // will be updated from poll method
 
-    // enables setClosedLoop function:
+    // enables setClosedLoop function
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
     setIntegerParam(pC_->motorStatusGainSupport_, 1);
 
@@ -258,12 +260,6 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
     std::vector<double> status;
     pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
     
-    // Get the frequency and temperature values (should be in move function only?)
-    pC_->getIntegerParam(pC_->CpscFrequencyX_, &this->frequency);
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "frequency = %d\n", this->frequency);
-    pC_->getIntegerParam(pC_->CpscTemperatureX_, &this->temperature);
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "temperature = %d\n\n", this->temperature);
-
     // Read position
     std::map<int, std::string> axis_map = {
         {1, "CS021-RLS.X"},
@@ -329,7 +325,7 @@ asynStatus CpscMotorAxis::poll(bool *moving) {
         done = status.at(FBStatus::DONE);
         setIntegerParam(pC_->motorStatusDone_, done);
         setIntegerParam(pC_->motorStatusMoving_, !done);
-        *moving = !status.at(1);
+        *moving = !done; // *moving = !status.at(1);
 
         if (status.at(FBStatus::INVALID_SP1)) {
             asynPrint(pasynUser_, ASYN_TRACE_ERROR,
@@ -357,13 +353,25 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
     asynStatus status;
 
     if (closedLoop) {
-        // enable closed loop
-        asynPrint(pasynUser_,ASYN_TRACE_ERROR, "(Axis %d): Feedback mode enabled\n",axisIndex_);
-        sprintf(pC_->outString_, "FBEN CS021-RLS.X 600 CS021-RLS.Y 600 CS021-RLS.Z 600 1 293");
+        if (not fben) {
+            // Get the frequency and temperature values
+            pC_->getIntegerParam(pC_->CpscFrequencyX_, &pC_->frequencyX);
+            pC_->getIntegerParam(pC_->CpscFrequencyY_, &pC_->frequencyY);
+            pC_->getIntegerParam(pC_->CpscFrequencyZ_, &pC_->frequencyZ);
+            pC_->getIntegerParam(pC_->CpscTemperature_, &pC_->temperature);
+        
+            // enable closed loop
+            asynPrint(pasynUser_,ASYN_TRACE_ERROR, "Enabling feedback mode...\n");
+            asynPrint(pasynUser_,ASYN_TRACE_ERROR, "FBEN CS021-RLS.X %d CS021-RLS.Y %d CS021-RLS.Z %d 1 %d\n", pC_->frequencyX, pC_->frequencyY, pC_->frequencyZ, pC_->temperature);
+            sprintf(pC_->outString_, "FBEN CS021-RLS.X 600 CS021-RLS.Y 600 CS021-RLS.Z 600 1 293");
+        }
+        else {
+            asynPrint(pasynUser_,ASYN_TRACE_ERROR, "Feedback mode already enabled\n");
+        }
     }
     else {
         // disable closed loop
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "(Axis %d): Feedback mode disabled\n", axisIndex_);
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Feedback mode disabled\n");
         sprintf(pC_->outString_, "FBXT");
     }
 

@@ -3,7 +3,13 @@
 #include "asynMotorAxis.h"
 
 static constexpr char CpscFrequencyXString[] = "CPSC_FREQUENCY_X";
-static constexpr char CpscTemperatureXString[] = "CPSC_TEMPERATURE_X";
+static constexpr char CpscFrequencyYString[] = "CPSC_FREQUENCY_Y";
+static constexpr char CpscFrequencyZString[] = "CPSC_FREQUENCY_Z";
+static constexpr char CpscTemperatureString[] = "CPSC_TEMPERATURE";
+
+static constexpr int DEFAULT_FREQUENCY = 600;
+static constexpr int DEFAULT_TEMPERATURE = 293;
+
 
 class epicsShareClass CpscMotorAxis : public asynMotorAxis {
     public:
@@ -22,8 +28,6 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
         bool once;
         double mres;
         bool fben; // feedback enabled
-        int frequency;
-        int temperature;
     
     friend class CpscMotorController;
 };
@@ -36,11 +40,17 @@ class epicsShareClass CpscMotorController : public asynMotorController {
         void report(FILE *fp, int level);
         CpscMotorAxis* getAxis(asynUser *pasynUser);
         CpscMotorAxis* getAxis(int axisNo);
-        // asynStatus writeFloat64(asynUser *pasynUser, epicsFloat64 value);
 
     protected:
         int CpscFrequencyX_;
-        int CpscTemperatureX_;
+        int CpscFrequencyY_;
+        int CpscFrequencyZ_;
+        int CpscTemperature_;
+    
+        int frequencyX = DEFAULT_FREQUENCY;
+        int frequencyY = DEFAULT_FREQUENCY;
+        int frequencyZ = DEFAULT_FREQUENCY;
+        int temperature = DEFAULT_TEMPERATURE;
 
     friend class CpscMotorAxis;
 

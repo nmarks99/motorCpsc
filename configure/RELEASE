@@ -32,7 +32,7 @@ SUPPORT=/APSshare/epics/synApps_6_2_1/support
 -include $(SUPPORT)/configure/RELEASE
 
 MOTOR=/APSshare/epics/synApps_6_2_1/support/motor-R7-2-2/
-CPSC=/local/nmarks/devel/jpe-cpsc/
+CPSC=/home/beams/NMARKS/devel/jpe-cpsc/
 # CPSC=/net/s4dserv/xorApps/epics/synApps_6_2_1/support/jpe-cpsc/
 
 # Include any non-standard support

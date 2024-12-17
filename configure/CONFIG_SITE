@@ -1,7 +1,6 @@
 # CONFIG_SITE
 
 -include $(SUPPORT)/configure/CONFIG_SITE
--include $(AREA_DETECTOR)/configure/CONFIG_SITE
 
 # Make any application-specific changes to the EPICS build
 # configuration variables in this file.
@@ -23,6 +22,7 @@ CHECK_RELEASE = YES
 #   for a subset of the cross-compiled target architectures
 #   that Base is built for.
 #CROSS_COMPILER_TARGET_ARCHS = vxWorks-68040
+CROSS_COMPILER_TARGET_ARCHS =
 
 # To install files into a location other than $(TOP) define
 #   INSTALL_LOCATION here.

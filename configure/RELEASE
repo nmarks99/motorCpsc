@@ -3,11 +3,11 @@
 # top directory each time this file is changed.
 ##############################################################################
 
-SUPPORT = /APSshare/epics/synApps_6_3/support
-EPICS_BASE = /APSshare/epics/base-7.0.8
+EPICS_BASE =
+SUPPORT =
 
-ASYN = $(SUPPORT)/asyn-R4-44-2
-MOTOR = $(SUPPORT)/motor-R7-3-1
+ASYN =
+MOTOR =
 
 # These lines allow developers to override these RELEASE settings
 # without having to modify this file directly.

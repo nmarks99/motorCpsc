@@ -1,4 +1,5 @@
 .loglogin
+.cache/
 *~
 O.*
 *.swp
@@ -19,3 +20,5 @@ built_*.req
 dbl-all.txt
 *.sav*
 scan1Menu.sav
+*.local
+compile_commands.json

@@ -1,19 +1,25 @@
+#include <algorithm>
+#include <iterator>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <asynOctetSyncIO.h>
+#include <epicsExport.h>
 #include <epicsThread.h>
 #include <iocsh.h>
 
-#include <asynOctetSyncIO.h>
-
-#include "asynDriver.h"
-#include "asynMotorAxis.h"
-#include "asynMotorController.h"
-
-#include <epicsExport.h>
-
 #include "cpsc_driver.hpp"
-#include "utils.hpp"
 
-using utils::Color;
-using utils::stylize;
+// Splits a c style string into a vector<double>
+std::vector<double> split_char_arr(const char* msg, char delimiter) {
+    std::string s_msg(msg);
+    std::replace(s_msg.begin(), s_msg.end(), delimiter, ' ');
+    std::istringstream ss(s_msg);
+    std::vector<double> v_out{std::istream_iterator<double>(ss), {}};
+    return v_out;
+}
 
 constexpr long MULT = 1000000000;        // controller reports in meters with nanometer precision
 constexpr double LOW_LIMIT = -4802360.0; // nanometers (for axis 1 only?)
@@ -23,12 +29,10 @@ constexpr double HIGH_LIMIT = 4802361.0; // nanometers (for axis 1 only?)
 // CpscMotorController
 // ===================
 
-constexpr int NUM_PARAMS = 0;
-
 /// \brief Create a new CpscMotorController object
 ///
 /// \param[in] portName             The name of the asyn port that will be created for this driver
-/// \param[in] CpscPortName The name of the drvAsynIPPort that was created previously
+/// \param[in] CpscPortName         The name of the drvAsynIPPort that was created previously
 /// \param[in] numAxes              The number of axes that this controller supports
 /// \param[in] movingPollPeriod     The time between polls when any axis is moving
 /// \param[in] idlePollPeriod       The time between polls when no axis is moving
@@ -43,15 +47,14 @@ CpscMotorController::CpscMotorController(const char* portName, const char* CpscM
 {
     asynStatus status;
     int axis;
-    CpscMotorAxis* pAxis;
     static const char* functionName = "CpscMotorController::CpscMotorController";
 
     // Create additional parameters for user. See JPE CPSC software user manual
-    createParam(CpscFrequencyXString, asynParamInt32, &CpscFrequencyX_);
-    createParam(CpscFrequencyYString, asynParamInt32, &CpscFrequencyY_);
-    createParam(CpscFrequencyZString, asynParamInt32, &CpscFrequencyZ_);
-    createParam(CpscTemperatureString, asynParamInt32, &CpscTemperature_);
-    createParam(CpscDriveFactorString, asynParamFloat64, &CpscDriveFactor_);
+    createParam("CPSC_FREQUENCY_X", asynParamInt32, &CpscFrequencyXIndex_);
+    createParam("CPSC_FREQUENCY_Y", asynParamInt32, &CpscFrequencyYIndex_);
+    createParam("CPSC_FREQUENCY_Z", asynParamInt32, &CpscFrequencyZIndex_);
+    createParam("CPSC_TEMPERATURE", asynParamInt32, &CpscTemperatureIndex_);
+    createParam("CPSC_DRIVE_FACTOR", asynParamFloat64, &CpscDriveFactorIndex_);
 
     if (numAxes > 3) {
         asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Requested %d axes but 3 will be used", numAxes);
@@ -68,7 +71,7 @@ CpscMotorController::CpscMotorController(const char* portName, const char* CpscM
     // Create CpscMotorAxis object for each axis
     // if not done here, user must call CpscMotorCreateAxis from cmd file
     for (axis = 0; axis < numAxes; axis++) {
-        pAxis = new CpscMotorAxis(this, axis);
+        new CpscMotorAxis(this, axis);
     }
 
     startPoller(movingPollPeriod, idlePollPeriod, 2);
@@ -142,8 +145,7 @@ CpscMotorAxis::CpscMotorAxis(CpscMotorController* pC, int axisNo) : asynMotorAxi
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
     setIntegerParam(pC_->motorStatusGainSupport_, 1);
 
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL,
-              stylize("CpscMotorAxis created with axis index %d\n", Color::GREEN).c_str(), axisIndex_);
+    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "CpscMotorAxis created with axis index %d\n", axisIndex_);
 
     callParamCallbacks();
 }
@@ -181,7 +183,6 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
     // [SPx] - setpoint in meters
     // [ABS] - 1 absolute positioning (relative to center of stage)
     //       - 0 relative position (relative to current position)
-    asynStatus status;
 
     // Only allowing closed-loop motion from EPICS for now.
     // Use MOV commands directly if open-loop motion is needed.
@@ -207,20 +208,17 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
             asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
         }
     } else {
-        asynPrint(
-            pasynUser_, ASYN_TRACE_ERROR,
-            stylize("Warning(Axis %d): Move aborted. Feedback mode is disabled\n", Color::YELLOW).c_str(),
-            axisIndex_);
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
+                  "Warning(Axis %d): Move aborted. Feedback mode is disabled\n",
+                  axisIndex_);
     }
-    status = pC_->writeReadController();
+    asynStatus status = pC_->writeReadController();
     return status;
 }
 
 /// \brief home the axis (move to absolute zero)
 /// Note: will abort and do nothing if not in feedback mode
 asynStatus CpscMotorAxis::home(double minVelocity, double maxVelocity, double acceleration, int forwards) {
-    asynStatus status;
-
     std::map<int, const char*> axis_map = {
         {1, "FBCS 0.0 1 0.0 0 0.0 0"},
         {2, "FBCS 0.0 0 0.0 1 0.0 0"},
@@ -230,13 +228,12 @@ asynStatus CpscMotorAxis::home(double minVelocity, double maxVelocity, double ac
         asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "(Axis %d): Homing...\n", axisIndex_);
         sprintf(pC_->outString_, "%s", axis_map[axisIndex_]);
     } else {
-        asynPrint(
-            pasynUser_, ASYN_TRACE_ERROR,
-            stylize("Warning(Axis %d): Move aborted. Feedback mode is disabled\n", Color::YELLOW).c_str(),
-            axisIndex_);
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
+                  "Warning(Axis %d): Move aborted. Feedback mode is disabled\n",
+                  axisIndex_);
     }
 
-    status = pC_->writeReadController();
+    asynStatus status = pC_->writeReadController();
     return status;
 }
 
@@ -274,7 +271,7 @@ asynStatus CpscMotorAxis::poll(bool* moving) {
     }
 
     // split input char* by ',' into a std::vector<double>
-    status = utils::split_char_arr(pC_->inString_, ',');
+    status = split_char_arr(pC_->inString_, ',');
 
     // Status indices
     enum FBStatus {
@@ -291,8 +288,7 @@ asynStatus CpscMotorAxis::poll(bool* moving) {
     // Handle error codes
     if (not status.at(FBStatus::ENABLED)) {
         if (once) {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                      stylize("Warning(Axis %d): Feedback mode is disabled\n", Color::YELLOW).c_str(),
+            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Warning(Axis %d): Feedback mode is disabled\n",
                       axisIndex_);
             once = false;
         }
@@ -309,16 +305,13 @@ asynStatus CpscMotorAxis::poll(bool* moving) {
         *moving = !done; // *moving = !status.at(1);
 
         if (status.at(FBStatus::INVALID_SP1)) {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                      stylize("Error: Invalid setpoint on axis 1\n", Color::RED).c_str(), axisIndex_);
+            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 1\n");
         }
         if (status.at(FBStatus::INVALID_SP2)) {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                      stylize("Error: Invalid setpoint on axis 2\n", Color::RED).c_str(), axisIndex_);
+            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 2\n");
         }
         if (status.at(FBStatus::INVALID_SP3)) {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                      stylize("Error: Invalid setpoint on axis 3\n", Color::RED).c_str(), axisIndex_);
+            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 3\n");
         }
     }
 
@@ -335,11 +328,11 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
     if (closedLoop) {
         if (not fben) {
             // Get the frequency and temperature values
-            pC_->getIntegerParam(pC_->CpscFrequencyX_, &pC_->frequencyX);
-            pC_->getIntegerParam(pC_->CpscFrequencyY_, &pC_->frequencyY);
-            pC_->getIntegerParam(pC_->CpscFrequencyZ_, &pC_->frequencyZ);
-            pC_->getIntegerParam(pC_->CpscTemperature_, &pC_->temperature);
-            pC_->getDoubleParam(pC_->CpscDriveFactor_, &pC_->drive_factor);
+            pC_->getIntegerParam(pC_->CpscFrequencyXIndex_, &pC_->frequencyX);
+            pC_->getIntegerParam(pC_->CpscFrequencyYIndex_, &pC_->frequencyY);
+            pC_->getIntegerParam(pC_->CpscFrequencyZIndex_, &pC_->frequencyZ);
+            pC_->getIntegerParam(pC_->CpscTemperatureIndex_, &pC_->temperature);
+            pC_->getDoubleParam(pC_->CpscDriveFactorIndex_, &pC_->drive_factor);
 
             // enable closed loop
             asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Enabling feedback mode...\n");
@@ -364,11 +357,10 @@ asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
 }
 
 // ==================
-// iosch registration
+// iocsh registration
 // ==================
-
-static const iocshArg CpscMotorCreateControllerArg0 = {"Port name", iocshArgString};
-static const iocshArg CpscMotorCreateControllerArg1 = {"VMC port name", iocshArgString};
+static const iocshArg CpscMotorCreateControllerArg0 = {"Asyn port name", iocshArgString};
+static const iocshArg CpscMotorCreateControllerArg1 = {"drvAsynIPPort name", iocshArgString};
 static const iocshArg CpscMotorCreateControllerArg2 = {"Number of axes", iocshArgInt};
 static const iocshArg CpscMotorCreateControllerArg3 = {"Moving poll period (ms)", iocshArgInt};
 static const iocshArg CpscMotorCreateControllerArg4 = {"Idle poll period (ms)", iocshArgInt};

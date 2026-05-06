@@ -1,0 +1,15 @@
+# Connect to device (ethernet or serial)
+# Serial is also supported
+drvAsynIPPortConfigure("CPSC_ETH", "164.54.115.41:2000")
+asynOctetSetInputEos("CPSC_ETH", 0, "\r\n")
+asynOctetSetOutputEos("CPSC_ETH", 0, "\r\n")
+
+# Load asynRecord for debugging
+dbLoadRecords("$(ASYN)/db/asynRecord.db", "P=$(PREFIX), R=asyn_1, PORT=CPSC_ETH, ADDR=0, OMAX=$(OUT_BUFF=1000), IMAX=$(IN_BUFF=1000)")
+
+# Load motor records
+dbLoadTemplate("cpsc.substitutions", "P=$(PREFIX)")
+
+# Create controller, load database for extra parameters
+CpscMotorCreateController("CPSC1", "CPSC_ETH", 3, 50, 250)
+dbLoadRecords("$(MOTOR_CPSC)/db/CPSCParams.db", "P=$(PREFIX), PORT=CPSC1, ADDR=0")

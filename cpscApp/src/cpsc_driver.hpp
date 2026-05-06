@@ -2,11 +2,11 @@
 #include "asynMotorAxis.h"
 #include "asynMotorController.h"
 
-static constexpr char CpscFrequencyXString[] = "CPSC_FREQUENCY_X";
-static constexpr char CpscFrequencyYString[] = "CPSC_FREQUENCY_Y";
-static constexpr char CpscFrequencyZString[] = "CPSC_FREQUENCY_Z";
-static constexpr char CpscTemperatureString[] = "CPSC_TEMPERATURE";
-static constexpr char CpscDriveFactorString[] = "CPSC_DRIVE_FACTOR";
+// static constexpr char CpscFrequencyXString[] = "CPSC_FREQUENCY_X";
+// static constexpr char CpscFrequencyYString[] = "CPSC_FREQUENCY_Y";
+// static constexpr char CpscFrequencyZString[] = "CPSC_FREQUENCY_Z";
+// static constexpr char CpscTemperatureString[] = "CPSC_TEMPERATURE";
+// static constexpr char CpscDriveFactorString[] = "CPSC_DRIVE_FACTOR";
 
 static constexpr int DEFAULT_FREQUENCY = 600;
 static constexpr int DEFAULT_TEMPERATURE = 293;
@@ -42,18 +42,20 @@ class epicsShareClass CpscMotorController : public asynMotorController {
     CpscMotorAxis* getAxis(asynUser* pasynUser);
     CpscMotorAxis* getAxis(int axisNo);
 
-  protected:
-    int CpscFrequencyX_;
-    int CpscFrequencyY_;
-    int CpscFrequencyZ_;
-    int CpscTemperature_;
-    int CpscDriveFactor_;
-
+  private:
     int frequencyX = DEFAULT_FREQUENCY;
     int frequencyY = DEFAULT_FREQUENCY;
     int frequencyZ = DEFAULT_FREQUENCY;
     int temperature = DEFAULT_TEMPERATURE;
     double drive_factor = DEFAULT_DRIVE_FACTOR;
+
+  protected:
+    static constexpr int NUM_PARAMS = 5;
+    int CpscFrequencyXIndex_;
+    int CpscFrequencyYIndex_;
+    int CpscFrequencyZIndex_;
+    int CpscTemperatureIndex_;
+    int CpscDriveFactorIndex_;
 
     friend class CpscMotorAxis;
 };

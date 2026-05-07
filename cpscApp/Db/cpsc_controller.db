@@ -1,0 +1,20 @@
+record(bo, "$(P)CPSC:FeedbackEnable") {
+    field(DTYP, "asynInt32")
+    field(OUT, "@asyn($(PORT),$(ADDR=0),$(TIMEOUT=1))CPSC_FEEDBACK_ENABLE")
+    field(ZNAM, "Disable")
+    field(ONAM, "Enable")
+}
+record(bi, "$(P)CPSC:FeedbackEnableRBV") {
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDD=0))CPSC_FEEDBACK_ENABLE")
+    field(ZNAM, "Disabled")
+    field(ONAM, "Enabled")
+    field(SCAN, "I/O Intr")
+}
+
+record(bi, "$(P)CPSC:FeedbackDone") {
+    field(DTYP, "asynInt32")
+    field(INP, "@asyn($(PORT),$(ADDR=0),$(TIMEOUT=1))CPSC_FEEDBACK_DONE")
+    field(ZNAM, "Done")
+    field(ONAM, "Active")
+}

@@ -1,6 +1,6 @@
 #include <algorithm>
+#include <array>
 #include <iterator>
-#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -13,11 +13,11 @@
 #include "cpsc_driver.hpp"
 
 // Splits a c style string into a vector<double>
-std::vector<double> split_char_arr(const char* msg, char delimiter) {
+std::vector<int> split_char_arr(const char* msg, char delimiter) {
     std::string s_msg(msg);
     std::replace(s_msg.begin(), s_msg.end(), delimiter, ' ');
     std::istringstream ss(s_msg);
-    std::vector<double> v_out{std::istream_iterator<double>(ss), {}};
+    std::vector<int> v_out{std::istream_iterator<double>(ss), {}};
     return v_out;
 }
 
@@ -46,33 +46,31 @@ CpscMotorController::CpscMotorController(const char* portName, const char* CpscM
                           0, 0) // Default priority and stack size
 {
     asynStatus status;
-    int axis;
     static const char* functionName = "CpscMotorController::CpscMotorController";
 
-    // Create additional parameters for user. See JPE CPSC software user manual
-    createParam("CPSC_FREQUENCY_X", asynParamInt32, &CpscFrequencyXIndex_);
-    createParam("CPSC_FREQUENCY_Y", asynParamInt32, &CpscFrequencyYIndex_);
-    createParam("CPSC_FREQUENCY_Z", asynParamInt32, &CpscFrequencyZIndex_);
+    createParam("CPSC_FREQUENCY", asynParamInt32, &CpscFrequencyIndex_);
     createParam("CPSC_TEMPERATURE", asynParamInt32, &CpscTemperatureIndex_);
     createParam("CPSC_DRIVE_FACTOR", asynParamFloat64, &CpscDriveFactorIndex_);
+    createParam("CPSC_FEEDBACK_ENABLE", asynParamInt32, &CpscFeedbackEnableIndex_);
+    createParam("CPSC_FEEDBACK_DONE", asynParamInt32, &CpscFeedbackDoneIndex_);
 
     if (numAxes > 3) {
         asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Requested %d axes but 3 will be used", numAxes);
         numAxes = 3;
     }
 
-    // Connect to motor controller
     status = pasynOctetSyncIO->connect(CpscMotorPortName, 0, &pasynUserController_, NULL);
     if (status) {
         asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "%s: cannot connect to CPSC motor controller\n",
                   functionName);
     }
+    sprintf(outString_, "/VER");
+    writeReadController();
+    asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, "Version: %s\n", inString_);
 
-    // Create CpscMotorAxis object for each axis
-    // if not done here, user must call CpscMotorCreateAxis from cmd file
-    for (axis = 0; axis < numAxes; axis++) {
-        new CpscMotorAxis(this, axis);
-    }
+    sprintf(outString_, "/MODLIST");
+    writeReadController();
+    asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, "Modules: %s\n", inString_);
 
     startPoller(movingPollPeriod, idlePollPeriod, 2);
 }
@@ -87,10 +85,9 @@ CpscMotorController::CpscMotorController(const char* portName, const char* CpscM
 /// \param[in] idlePollPeriod       The time in ms between polls when no axis is moving
 extern "C" int CpscMotorCreateController(const char* portName, const char* CpscMotorPortName, int numAxes,
                                          int movingPollPeriod, int idlePollPeriod) {
-    CpscMotorController* pCpscMotorController = new CpscMotorController(
-        portName, CpscMotorPortName, numAxes, movingPollPeriod / 1000., idlePollPeriod / 1000.);
-    pCpscMotorController = NULL;
-    return (asynSuccess);
+    new CpscMotorController(portName, CpscMotorPortName, numAxes, movingPollPeriod / 1000.,
+                            idlePollPeriod / 1000.);
+    return asynSuccess;
 }
 
 /// \brief Reports on status of the driver
@@ -123,243 +120,209 @@ CpscMotorAxis* CpscMotorController::getAxis(int axisNo) {
     return static_cast<CpscMotorAxis*>(asynMotorController::getAxis(axisNo));
 }
 
+asynStatus CpscMotorController::writeInt32(asynUser* pasynUser, epicsInt32 value) {
+    int function = pasynUser->reason;
+    asynStatus status = asynSuccess;
+
+    if (function == CpscFeedbackEnableIndex_) {
+        // TODO: build FBEN/FBXT command from axis sensor names and frequencies
+        if (value) {
+            std::string fben_cmd = "FBEN ";
+            for (int i = 0; i < numAxes_; i++) {
+                CpscMotorAxis* paxis = getAxis(i);
+                if (!paxis) {
+                    return asynError;
+                }
+                int freq = 0;
+                getIntegerParam(i, CpscFrequencyIndex_, &freq);
+                fben_cmd += paxis->sensor_name_ + " " + std::to_string(freq) + " ";
+            }
+            sprintf(outString_, "%s%.1lf %d", fben_cmd.c_str(), drive_factor_, temperature_);
+        } else {
+            sprintf(outString_, "FBXT");
+        }
+        printf("Enable command: %s\n", outString_);
+        // status = writeReadController();
+    } else {
+        status = asynMotorController::writeInt32(pasynUser, value);
+    }
+
+    callParamCallbacks();
+    return status;
+}
+
+// Status indices
+enum FBStatus {
+    ENABLED = 0,
+    DONE = 1,
+    INVALID_SP1 = 2,
+    INVALID_SP2 = 3,
+    INVALID_SP3 = 4,
+    POS_ERROR1 = 5,
+    POS_ERROR2 = 6,
+    POS_ERROR3 = 7
+};
+
+asynStatus CpscMotorController::poll() {
+    asynStatus asyn_status = asynSuccess;
+
+    // Read feedback status
+    sprintf(outString_, "FBST");
+    asyn_status = writeReadController();
+    // TODO: check asyn_status
+
+    // split input char* by ',' into a std::vector<int>
+    std::vector<int> fbstatus = split_char_arr(inString_, ',');
+    closed_loop_ = fbstatus[FBStatus::ENABLED];
+    setIntegerParam(CpscFeedbackEnableIndex_, closed_loop_);
+    int done = fbstatus[FBStatus::DONE];
+    setIntegerParam(CpscFeedbackDoneIndex_, done);
+    // printf("    Feedback enabled: %d\n", fbstatus[FBStatus::ENABLED]);
+    // printf("       Feedback done: %d\n", fbstatus[FBStatus::DONE]);
+    // printf("Feedback Invalid SP1: %d\n", fbstatus[FBStatus::INVALID_SP1]);
+    // printf("Feedback Invalid SP2: %d\n", fbstatus[FBStatus::INVALID_SP2]);
+    // printf("Feedback Invalid SP3: %d\n", fbstatus[FBStatus::INVALID_SP3]);
+    // printf("Feedback Pos error 1: %d\n", fbstatus[FBStatus::POS_ERROR1]);
+    // printf("Feedback Pos error 2: %d\n", fbstatus[FBStatus::POS_ERROR2]);
+    // printf("Feedback Pos error 3: %d\n\n", fbstatus[FBStatus::POS_ERROR3]);
+    callParamCallbacks();
+    return asyn_status;
+}
+
 // =============
 // CpscMotorAxis
 // =============
 
-/// \breif Creates a new VirtualMotorAxis object.
-/// \param[in] pC Pointer to the VirtualMotorController to which this axis belongs.
-/// \param[in] axisNo Index number of this axis, range 0 to pC->numAxes_-1.
-///
-/// Initializes register numbers, etc.
-/// Note: the following constructor needs to be modified to accept the stepSize argument if
-/// CpscMotorCreateAxis will be called from iocsh, which is necessary for controllers that work in EGU
-/// (engineering units) instead of steps.
-CpscMotorAxis::CpscMotorAxis(CpscMotorController* pC, int axisNo) : asynMotorAxis(pC, axisNo), pC_(pC) {
+CpscMotorAxis::CpscMotorAxis(CpscMotorController* pC, int axisNo, const char* sensor_name)
+    : asynMotorAxis(pC, axisNo), pC_(pC), sensor_name_(sensor_name) {
 
     axisIndex_ = axisNo + 1;
-    this->once = true;
-    this->fben = false; // will be updated from poll method
 
-    // enables setClosedLoop function
     setIntegerParam(pC_->motorStatusHasEncoder_, 1);
     setIntegerParam(pC_->motorStatusGainSupport_, 1);
-
-    asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "CpscMotorAxis created with axis index %d\n", axisIndex_);
 
     callParamCallbacks();
 }
 
-/// \brief Report on the axis
 void CpscMotorAxis::report(FILE* fp, int level) {
     if (level > 0) {
-        fprintf(fp, " Axis #%d\n", axisNo_);
-        fprintf(fp, " axisIndex_=%d\n", axisIndex_);
+        fprintf(fp, "  Axis #%d, sensor=%s\n", axisNo_, sensor_name_.c_str());
     }
     asynMotorAxis::report(fp, level);
 }
 
-/// \brief Stop the axis
 asynStatus CpscMotorAxis::stop(double acceleration) {
-    asynStatus status;
-    if (fben) {
-        // Feedback mode E-stop
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBES\n");
+    if (pC_->closed_loop_) {
         sprintf(pC_->outString_, "FBES");
     } else {
-        // Open-loop mode stop axis
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "STP %d\n", axisIndex_);
         sprintf(pC_->outString_, "STP %d", axisIndex_);
     }
-    status = pC_->writeReadController();
-    return status;
+    return pC_->writeReadController();
 }
 
-/// \brief Move the axis
 asynStatus CpscMotorAxis::move(double position, int relative, double min_velocity, double max_velocity,
                                double acceleration) {
-    // Go to setpoint
-    // FBCS [SP1] [ABS] [SP2] [ABS] [SP3] [ABS]
-    // [SPx] - setpoint in meters
-    // [ABS] - 1 absolute positioning (relative to center of stage)
-    //       - 0 relative position (relative to current position)
-
-    // Only allowing closed-loop motion from EPICS for now.
-    // Use MOV commands directly if open-loop motion is needed.
-    if (fben) {
+    if (pC_->closed_loop_) {
+        // FBCS [SP1] [ABS] [SP2] [ABS] [SP3] [ABS]
+        // [SPx] - setpoint in meters
+        // [ABS] - 1 absolute positioning (relative to center of stage)
+        //       - 0 relative position (relative to current position)
         position = position / MULT; // convert to meters before sending
-
-        // sets the setpoint for the current axis to "position" absolute
-        // other axes are set to move 0.0 relative to their current position
         switch (axisIndex_) {
         case 1:
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS %.9lf 1 0 0 0 0\n", position);
             sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
             break;
         case 2:
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 %.9lf 1 0 0\n", position);
             sprintf(pC_->outString_, "FBCS 0 0 %lf 1 0 0", position);
             break;
         case 3:
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "FBCS 0 0 0 0 %.9lf 1\n", position);
             sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
             break;
-        default:
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "Invalid axis index %d\n", axisIndex_);
         }
+        printf("Move command: %s\n", pC_->outString_);
+        // pC_->writeReadController();
     } else {
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                  "Warning(Axis %d): Move aborted. Feedback mode is disabled\n",
-                  axisIndex_);
+        printf("Open loop move not implemeted\n");
+        // open loop move
     }
-    asynStatus status = pC_->writeReadController();
-    return status;
+
+    return asynSuccess;
 }
 
-/// \brief home the axis (move to absolute zero)
-/// Note: will abort and do nothing if not in feedback mode
 asynStatus CpscMotorAxis::home(double minVelocity, double maxVelocity, double acceleration, int forwards) {
-    std::map<int, const char*> axis_map = {
-        {1, "FBCS 0.0 1 0.0 0 0.0 0"},
-        {2, "FBCS 0.0 0 0.0 1 0.0 0"},
-        {3, "FBCS 0.0 0 0.0 0 0.0 1"},
-    };
-    if (fben) {
-        asynPrint(pasynUser_, ASYN_REASON_SIGNAL, "(Axis %d): Homing...\n", axisIndex_);
-        sprintf(pC_->outString_, "%s", axis_map[axisIndex_]);
-    } else {
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR,
-                  "Warning(Axis %d): Move aborted. Feedback mode is disabled\n",
-                  axisIndex_);
-    }
-
-    asynStatus status = pC_->writeReadController();
-    return status;
+    asynPrint(pasynUser_, ASYN_TRACE_ERROR, "CpscMotorAxis::home not implemented\n");
+    // TODO: reimplement with controller-level fben_ and sensor_name_
+    // std::map<int, const char*> axis_map = {
+    //     {1, "FBCS 0.0 1 0.0 0 0.0 0"},
+    //     {2, "FBCS 0.0 0 0.0 1 0.0 0"},
+    //     {3, "FBCS 0.0 0 0.0 0 0.0 1"},
+    // };
+    // if (fben) {
+    //     sprintf(pC_->outString_, "%s", axis_map[axisIndex_]);
+    // }
+    // asynStatus status = pC_->writeReadController();
+    // return status;
+    return asynSuccess;
 }
 
-/// \brief Poll the axis
 asynStatus CpscMotorAxis::poll(bool* moving) {
-    asynStatus asyn_status;
-    double position_m = 0.0;
-    long long_position_nm = 0;
-    int done = 1;
-    std::vector<double> status;
-    pC_->getDoubleParam(axisNo_, pC_->motorRecResolution_, &this->mres);
+    asynStatus asyn_status = asynSuccess;
 
     // Read position
-    std::map<int, std::string> axis_map = {{1, "CS021-RLS.X"}, {2, "CS021-RLS.Y"}, {3, "CS021-RLS.Z"}};
-    sprintf(pC_->outString_, "PGV 4 %d %s", axisIndex_, axis_map[axisIndex_].c_str());
+    sprintf(pC_->outString_, "PGV 4 %d %s", axisIndex_, sensor_name_.c_str());
     asyn_status = pC_->writeReadController();
-    if (asyn_status) {
-        goto skip;
-    }
 
-    // Adjust MRES to obtain the desired units of the readback values
-    // MRES = 1.0  -> nanometers
-    // MRES = 1e-3 -> micrometers
-    // MRES = 1e-6 -> millimeters
-    // MRES = 1e-9 -> meters
-    position_m = atof((const char*)&pC_->inString_);
-    long_position_nm = MULT * position_m;
+    // TODO: handle asyn_status
+    double position_m = atof((const char*)&pC_->inString_);
+    long long_position_nm = MULT * position_m;
     setDoubleParam(pC_->motorPosition_, long_position_nm); // RRBV [nanometers]
 
-    // Read status
-    sprintf(pC_->outString_, "FBST");
-    asyn_status = pC_->writeReadController();
-    if (asyn_status) {
-        goto skip;
-    }
-
-    // split input char* by ',' into a std::vector<double>
-    status = split_char_arr(pC_->inString_, ',');
-
-    // Status indices
-    enum FBStatus {
-        ENABLED = 0,
-        DONE = 1,
-        INVALID_SP1 = 2,
-        INVALID_SP2 = 3,
-        INVALID_SP3 = 4,
-        POS_ERROR1 = 5,
-        POS_ERROR2 = 6,
-        POS_ERROR3 = 7
-    };
-
-    // Handle error codes
-    if (not status.at(FBStatus::ENABLED)) {
-        if (once) {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Warning(Axis %d): Feedback mode is disabled\n",
-                      axisIndex_);
-            once = false;
-        }
-        fben = false;
-        done = 1;
-        setIntegerParam(pC_->motorStatusDone_, done);
-        setIntegerParam(pC_->motorStatusMoving_, !done);
-        *moving = 0;
-    } else {
-        fben = true;
-        done = status.at(FBStatus::DONE);
-        setIntegerParam(pC_->motorStatusDone_, done);
-        setIntegerParam(pC_->motorStatusMoving_, !done);
-        *moving = !done; // *moving = !status.at(1);
-
-        if (status.at(FBStatus::INVALID_SP1)) {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 1\n");
-        }
-        if (status.at(FBStatus::INVALID_SP2)) {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 2\n");
-        }
-        if (status.at(FBStatus::INVALID_SP3)) {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Error: Invalid setpoint on axis 3\n");
-        }
-    }
-
-skip:
-    setIntegerParam(pC_->motorStatusProblem_, asyn_status ? 1 : 0);
+    // TODO: implement moving check
+    int done = 1;
+    *moving = !done;
+    setIntegerParam(pC_->motorStatusDone_, done);
+    setIntegerParam(pC_->motorStatusMoving_, !done);
+    // int is_moving = 0;
+    // pC_->getIntegerParam(axisNo_, pC_->motorStatusMoving_, &is_moving);
+    // *moving = is_moving;
     callParamCallbacks();
-    return asyn_status ? asynError : asynSuccess;
+    return asyn_status;
 }
 
-/// \brief Enable closed loop (Servodrive mode)
 asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
-    asynStatus status;
+    // TODO: reimplement as per-axis open-loop/closed-loop toggle
+    // Previously this triggered controller-wide FBEN/FBXT, which is now
+    // handled by the CPSC_FEEDBACK_ENABLE parameter in writeInt32().
+    //
+    // if (closedLoop) {
+    //     if (not pC_->fben_) {
+    //         // build FBEN command from per-axis sensor names and frequencies
+    //     }
+    // } else {
+    //     sprintf(pC_->outString_, "FBXT");
+    //     pC_->writeReadController();
+    // }
+    printf("TODO: setClosedLoop(%s) on axis %d\n", closedLoop ? "true" : "false", axisNo_);
+    return asynSuccess;
+}
 
-    if (closedLoop) {
-        if (not fben) {
-            // Get the frequency and temperature values
-            pC_->getIntegerParam(pC_->CpscFrequencyXIndex_, &pC_->frequencyX);
-            pC_->getIntegerParam(pC_->CpscFrequencyYIndex_, &pC_->frequencyY);
-            pC_->getIntegerParam(pC_->CpscFrequencyZIndex_, &pC_->frequencyZ);
-            pC_->getIntegerParam(pC_->CpscTemperatureIndex_, &pC_->temperature);
-            pC_->getDoubleParam(pC_->CpscDriveFactorIndex_, &pC_->drive_factor);
-
-            // enable closed loop
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Enabling feedback mode...\n");
-            asynPrint(pasynUser_, ASYN_REASON_SIGNAL,
-                      "FBEN CS021-RLS.X %d CS021-RLS.Y %d CS021-RLS.Z %d %lf %d\n", pC_->frequencyX,
-                      pC_->frequencyY, pC_->frequencyZ, pC_->drive_factor, pC_->temperature);
-
-            sprintf(pC_->outString_, "FBEN CS021-RLS.X %d CS021-RLS.Y %d CS021-RLS.Z %d %lf %d\n",
-                    pC_->frequencyX, pC_->frequencyY, pC_->frequencyZ, pC_->drive_factor, pC_->temperature);
-            // sprintf(pC_->outString_, "FBEN CS021-RLS.X 600 CS021-RLS.Y 600 CS021-RLS.Z 600 1 293");
-        } else {
-            asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Feedback mode already enabled\n");
-        }
-    } else {
-        // disable closed loop
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Feedback mode disabled\n");
-        sprintf(pC_->outString_, "FBXT");
+extern "C" int CpscMotorCreateAxis(const char* ctrl_port, int axis_num, const char* sensor_name) {
+    CpscMotorController* pC;
+    pC = (CpscMotorController*)findAsynPortDriver(ctrl_port);
+    if (!pC) {
+        printf("CpscMotorCreateAxis: Error: controller %s not found\n", ctrl_port);
+        return asynError;
     }
-
-    status = pC_->writeReadController();
-    return status;
+    new CpscMotorAxis(pC, axis_num, sensor_name);
+    return asynSuccess;
 }
 
 // ==================
 // iocsh registration
 // ==================
-static const iocshArg CpscMotorCreateControllerArg0 = {"Asyn port name", iocshArgString};
+
+// CpscMotorCreateController
+static const iocshArg CpscMotorCreateControllerArg0 = {"Controller port name", iocshArgString};
 static const iocshArg CpscMotorCreateControllerArg1 = {"drvAsynIPPort name", iocshArgString};
 static const iocshArg CpscMotorCreateControllerArg2 = {"Number of axes", iocshArgInt};
 static const iocshArg CpscMotorCreateControllerArg3 = {"Moving poll period (ms)", iocshArgInt};
@@ -374,8 +337,21 @@ static void CpscMotorCreateControllerCallFunc(const iocshArgBuf* args) {
     CpscMotorCreateController(args[0].sval, args[1].sval, args[2].ival, args[3].ival, args[4].ival);
 }
 
+// CpscMotorCreateAxis
+static const iocshArg CpscMotorCreateAxisArg0 = {"Controller port name", iocshArgString};
+static const iocshArg CpscMotorCreateAxisArg1 = {"Axis number", iocshArgInt};
+static const iocshArg CpscMotorCreateAxisArg2 = {"Sensor name", iocshArgString};
+static const iocshArg* const CpscMotorCreateAxisArgs[] = {&CpscMotorCreateAxisArg0, &CpscMotorCreateAxisArg1,
+                                                          &CpscMotorCreateAxisArg2};
+static const iocshFuncDef CpscMotorCreateAxisDef = {"CpscMotorCreateAxis", 3, CpscMotorCreateAxisArgs};
+
+static void CpscMotorCreateAxisCallFunc(const iocshArgBuf* args) {
+    CpscMotorCreateAxis(args[0].sval, args[1].ival, args[2].sval);
+}
+
 static void CpscMotorRegister(void) {
     iocshRegister(&CpscMotorCreateControllerDef, CpscMotorCreateControllerCallFunc);
+    iocshRegister(&CpscMotorCreateAxisDef, CpscMotorCreateAxisCallFunc);
 }
 
 extern "C" {

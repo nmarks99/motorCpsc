@@ -10,14 +10,13 @@ include $(TOP)/configure/CONFIG
 #----------------------------------------------------
 # Create and install (or just install) into <top>/db
 # databases, templates, substitutions like this
-#DB += cpsc.db
-DB += CPSCParams.db
+#DB += NPDrive.db
 
-# DB += $(patsubst ../%, %, $(wildcard ../*.template))
-# DB += $(patsubst ../%, %, $(wildcard ../*.db))
-# DB += $(patsubst ../%, %, $(wildcard ../*.vdb))
-#
-# REQ += $(patsubst ../%, %, $(wildcard ../*.req))
+DB += $(patsubst ../%, %, $(wildcard ../*.template))
+DB += $(patsubst ../%, %, $(wildcard ../*.db))
+DB += $(patsubst ../%, %, $(wildcard ../*.vdb))
+
+REQ += $(patsubst ../%, %, $(wildcard ../*.req))
 
 #----------------------------------------------------
 # If <anyname>.db template is not named <anyname>*.template add

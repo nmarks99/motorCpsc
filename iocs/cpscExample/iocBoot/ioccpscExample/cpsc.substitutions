@@ -1,8 +1,17 @@
 file "$(MOTOR)/db/asyn_motor.db"
 {
 pattern
-{ M,         DTYP,   PORT,  ADDR,       DESC,  EGU,  DIR,  VMAX,  VELO,  VBAS,  ACCL,  BDST,  BVEL,  BACC,   MRES,  PREC,  DHLM,  DLLM,  INIT}
-{m1,  "asynMotor",  CPSC1,     0,  "Motor 1",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     9,     0,     0,    ""}
-{m2,  "asynMotor",  CPSC1,     1,  "Motor 2",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     9,     0,     0,    ""}
-{m3,  "asynMotor",  CPSC1,     2,  "Motor 3",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     9,     0,     0,    ""}
+{ M,         DTYP,     PORT,  ADDR,       DESC,  EGU,  DIR,  VMAX,  VELO,  VBAS,  ACCL,  BDST,  BVEL,  BACC,   MRES,  PREC,  DHLM,  DLLM,  INIT}
+{m1,  "asynMotor",  "CPSC1",     0,  "Motor 1",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     9,     0,     0,    ""}
+{m2,  "asynMotor",  "CPSC1",     1,  "Motor 2",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     9,     0,     0,    ""}
+{m3,  "asynMotor",  "CPSC1",     2,  "Motor 3",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     9,     0,     0,    ""}
+}
+
+file "$(MOTOR_CPSC)/db/cpsc_axis.db"
+{
+pattern
+{ M,     PORT,  ADDR}
+{m1,  "CPSC1",     0}
+{m2,  "CPSC1",     1}
+{m3,  "CPSC1",     2}
 }

@@ -1,0 +1,6 @@
+record(longout, "$(P)$(M):Frequency") {
+    field(DTYP, "asynInt32")
+    field(OUT, "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_FREQUENCY")
+    field(DRVL, 1)
+    field(DRVH, 600)
+}

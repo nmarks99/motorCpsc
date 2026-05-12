@@ -12,18 +12,20 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
   public:
     CpscMotorAxis(class CpscMotorController* pC, int axisNo, const char* sensorName);
 
-    void report(FILE* fp, int level);
-    asynStatus stop(double acceleration);
+    void report(FILE* fp, int level) override;
+    asynStatus stop(double acceleration) override;
     asynStatus move(double position, int relative, double min_velocity, double max_velocity,
-                    double acceleration);
-    asynStatus poll(bool* moving);
-    asynStatus setClosedLoop(bool closedLoop);
-    asynStatus home(double minVelocity, double maxVelocity, double acceleration, int forwards);
+                    double acceleration) override;
+    asynStatus poll(bool* moving) override;
+    // asynStatus home(double minVelocity, double maxVelocity, double acceleration, int forwards);
 
   private:
     CpscMotorController* pC_;
     int axisIndex_;
     std::string sensor_name_;
+    double last_pos_;
+    bool first_poll_;
+    double moving_deadband_ = 50.0; // nm
 
     friend class CpscMotorController;
 };
@@ -32,11 +34,12 @@ class epicsShareClass CpscMotorController : public asynMotorController {
   public:
     CpscMotorController(const char* portName, const char* CpscMotorPortName, int numAxes,
                         double movingPollPeriod, double idlePollPeriod);
-    asynStatus writeInt32(asynUser* pasynUser, epicsInt32 value);
-    asynStatus poll();
-    void report(FILE* fp, int level);
-    CpscMotorAxis* getAxis(asynUser* pasynUser);
-    CpscMotorAxis* getAxis(int axisNo);
+    asynStatus writeInt32(asynUser* pasynUser, epicsInt32 value) override;
+    asynStatus writeFloat64(asynUser* pasynUser, epicsFloat64 value) override;
+    asynStatus poll() override;
+    void report(FILE* fp, int level) override;
+    CpscMotorAxis* getAxis(asynUser* pasynUser) override;
+    CpscMotorAxis* getAxis(int axisNo) override;
 
   private:
     bool closed_loop_ = false;
@@ -44,10 +47,11 @@ class epicsShareClass CpscMotorController : public asynMotorController {
     double drive_factor_ = DEFAULT_DRIVE_FACTOR;
 
   protected:
-    static constexpr int NUM_PARAMS = 5;
+    static constexpr int NUM_PARAMS = 6;
     int CpscFrequencyIndex_;
     int CpscTemperatureIndex_;
     int CpscDriveFactorIndex_;
+    int CpscMovingDeadbandIndex_;
     int CpscFeedbackEnableIndex_;
     int CpscFeedbackDoneIndex_;
 

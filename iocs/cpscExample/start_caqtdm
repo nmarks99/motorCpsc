@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+CAQTDM_BIN="/APSshare/bin/caQtDM"
+SCRIPT_DIR=`dirname ${BASH_SOURCE:-$0}`
+MOTOR_UI_DIRS="/APSshare/epics/synApps_6_3/support/motor-R7-3-1/motorApp/op/ui/:/APSshare/epics/synApps_6_3/support/motor-R7-3-1/motorApp/op/ui/autoconvert/"
+ASYN_UI_DIRS="/APSshare/epics/synApps_6_3/support/asyn-R4-44-2/opi/caqtdm/autoconvert/:/APSshare/epics/synApps_6_3/support/asyn-R4-44-2/opi/caqtdm/"
+export CAQTDM_DISPLAY_PATH="${SCRIPT_DIR}/../../cpscApp/op/ui/autoconvert/:${MOTOR_UI_DIRS}:${ASYN_UI_DIRS}"
+
+${CAQTDM_BIN} -macro "P=cpscExample:,M1=m1,M2=m2,M3=m3" cpsc.ui

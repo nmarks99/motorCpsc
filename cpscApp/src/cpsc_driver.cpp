@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <iterator>
 #include <sstream>
 #include <string>
@@ -21,9 +22,10 @@ std::vector<int> split_char_arr(const char* msg, char delimiter) {
     return v_out;
 }
 
-constexpr long MULT = 1000000000;        // controller reports in meters with nanometer precision
-constexpr double LOW_LIMIT = -4802360.0; // nanometers (for axis 1 only?)
-constexpr double HIGH_LIMIT = 4802361.0; // nanometers (for axis 1 only?)
+constexpr long DRIVER_RESOLUTION = 1e9;   // controller reports in meters with nanometer precision
+constexpr double STEPS_PER_NANOMETER = 1; // TODO: What is this really?
+constexpr double LOW_LIMIT = -4802360.0;  // nanometers (for axis 1 only?)
+constexpr double HIGH_LIMIT = 4802361.0;  // nanometers (for axis 1 only?)
 
 // ===================
 // CpscMotorController
@@ -51,6 +53,7 @@ CpscMotorController::CpscMotorController(const char* portName, const char* CpscM
     createParam("CPSC_FREQUENCY", asynParamInt32, &CpscFrequencyIndex_);
     createParam("CPSC_TEMPERATURE", asynParamInt32, &CpscTemperatureIndex_);
     createParam("CPSC_DRIVE_FACTOR", asynParamFloat64, &CpscDriveFactorIndex_);
+    createParam("CPSC_MOVING_DEADBAND", asynParamFloat64, &CpscMovingDeadbandIndex_);
     createParam("CPSC_FEEDBACK_ENABLE", asynParamInt32, &CpscFeedbackEnableIndex_);
     createParam("CPSC_FEEDBACK_DONE", asynParamInt32, &CpscFeedbackDoneIndex_);
 
@@ -151,6 +154,26 @@ asynStatus CpscMotorController::writeInt32(asynUser* pasynUser, epicsInt32 value
     return status;
 }
 
+asynStatus CpscMotorController::writeFloat64(asynUser* pasynUser, epicsFloat64 value) {
+    int function = pasynUser->reason;
+    asynStatus asyn_status = asynSuccess;
+    CpscMotorAxis* paxis;
+
+    paxis = getAxis(pasynUser);
+    if (!paxis) {
+        return asynError;
+    }
+
+    if (function == CpscMovingDeadbandIndex_) {
+        printf("Setting moving deadband for axis %d to %lf\n", paxis->axisNo_, value);
+        paxis->moving_deadband_ = value;
+    } else {
+        asyn_status = asynMotorController::writeFloat64(pasynUser, value);
+    }
+
+    return asyn_status;
+}
+
 // Status indices
 enum FBStatus {
     ENABLED = 0,
@@ -194,7 +217,7 @@ asynStatus CpscMotorController::poll() {
 // =============
 
 CpscMotorAxis::CpscMotorAxis(CpscMotorController* pC, int axisNo, const char* sensor_name)
-    : asynMotorAxis(pC, axisNo), pC_(pC), sensor_name_(sensor_name) {
+    : asynMotorAxis(pC, axisNo), pC_(pC), sensor_name_(sensor_name), last_pos_(0.0), first_poll_(true) {
 
     axisIndex_ = axisNo + 1;
 
@@ -217,6 +240,7 @@ asynStatus CpscMotorAxis::stop(double acceleration) {
     } else {
         sprintf(pC_->outString_, "STP %d", axisIndex_);
     }
+    printf("%s\n", pC_->outString_);
     return pC_->writeReadController();
 }
 
@@ -227,7 +251,7 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
         // [SPx] - setpoint in meters
         // [ABS] - 1 absolute positioning (relative to center of stage)
         //       - 0 relative position (relative to current position)
-        position = position / MULT; // convert to meters before sending
+        position = position / DRIVER_RESOLUTION; // convert to meters before sending
         switch (axisIndex_) {
         case 1:
             sprintf(pC_->outString_, "FBCS %lf 1 0 0 0 0", position);
@@ -239,29 +263,16 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
             sprintf(pC_->outString_, "FBCS 0 0 0 0 %lf 1", position);
             break;
         }
-        printf("Move command: %s\n", pC_->outString_);
+        printf("Closed loop move: %s\n", pC_->outString_);
         // pC_->writeReadController();
     } else {
-        printf("Open loop move not implemeted\n");
         // open loop move
+        double nm_to_move = position - last_pos_;
+        bool dir = nm_to_move > 0 ? 1 : 0;
+        int steps_to_move = nm_to_move * STEPS_PER_NANOMETER;
+        printf("Open loop move: %d steps (%lf nm) in %d direction\n", steps_to_move, nm_to_move, dir);
     }
 
-    return asynSuccess;
-}
-
-asynStatus CpscMotorAxis::home(double minVelocity, double maxVelocity, double acceleration, int forwards) {
-    asynPrint(pasynUser_, ASYN_TRACE_ERROR, "CpscMotorAxis::home not implemented\n");
-    // TODO: reimplement with controller-level fben_ and sensor_name_
-    // std::map<int, const char*> axis_map = {
-    //     {1, "FBCS 0.0 1 0.0 0 0.0 0"},
-    //     {2, "FBCS 0.0 0 0.0 1 0.0 0"},
-    //     {3, "FBCS 0.0 0 0.0 0 0.0 1"},
-    // };
-    // if (fben) {
-    //     sprintf(pC_->outString_, "%s", axis_map[axisIndex_]);
-    // }
-    // asynStatus status = pC_->writeReadController();
-    // return status;
     return asynSuccess;
 }
 
@@ -271,39 +282,32 @@ asynStatus CpscMotorAxis::poll(bool* moving) {
     // Read position
     sprintf(pC_->outString_, "PGV 4 %d %s", axisIndex_, sensor_name_.c_str());
     asyn_status = pC_->writeReadController();
+    if (asyn_status) {
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "CpscMotorAxis::poll(): Communication error\n");
+        return asyn_status;
+    }
 
     // TODO: handle asyn_status
     double position_m = atof((const char*)&pC_->inString_);
-    long long_position_nm = MULT * position_m;
+    long long_position_nm = DRIVER_RESOLUTION * position_m;
     setDoubleParam(pC_->motorPosition_, long_position_nm); // RRBV [nanometers]
 
-    // TODO: implement moving check
+    // Determine if moving with position delta and configurable deadband
     int done = 1;
+    if (!first_poll_) {
+        double delta = fabs((double)long_position_nm - last_pos_);
+        if (delta > moving_deadband_)
+            done = 0;
+    }
+    last_pos_ = static_cast<double>(long_position_nm);
+    first_poll_ = false;
+
     *moving = !done;
     setIntegerParam(pC_->motorStatusDone_, done);
     setIntegerParam(pC_->motorStatusMoving_, !done);
-    // int is_moving = 0;
-    // pC_->getIntegerParam(axisNo_, pC_->motorStatusMoving_, &is_moving);
-    // *moving = is_moving;
+
     callParamCallbacks();
     return asyn_status;
-}
-
-asynStatus CpscMotorAxis::setClosedLoop(bool closedLoop) {
-    // TODO: reimplement as per-axis open-loop/closed-loop toggle
-    // Previously this triggered controller-wide FBEN/FBXT, which is now
-    // handled by the CPSC_FEEDBACK_ENABLE parameter in writeInt32().
-    //
-    // if (closedLoop) {
-    //     if (not pC_->fben_) {
-    //         // build FBEN command from per-axis sensor names and frequencies
-    //     }
-    // } else {
-    //     sprintf(pC_->outString_, "FBXT");
-    //     pC_->writeReadController();
-    // }
-    printf("TODO: setClosedLoop(%s) on axis %d\n", closedLoop ? "true" : "false", axisNo_);
-    return asynSuccess;
 }
 
 extern "C" int CpscMotorCreateAxis(const char* ctrl_port, int axis_num, const char* sensor_name) {

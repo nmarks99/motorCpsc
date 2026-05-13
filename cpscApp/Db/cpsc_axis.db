@@ -1,14 +1,25 @@
 record(longout, "$(P)$(M):Frequency") {
     field(DTYP, "asynInt32")
+    field(PINI, "YES")
     field(OUT, "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_FREQUENCY")
-    field(VAL, 600)
     field(EGU, "Hz")
+    field(VAL, 600)
     field(DRVL, 1)
     field(DRVH, 600)
 }
 
+record(ao, "$(P)$(M):DriveFactor") {
+    field(DTYP, "asynFloat64")
+    field(PINI, "YES")
+    field(DRVL, 0.1)
+    field(DRVH, 3.0)
+    field(VAL, 1.0)
+    field(OUT, "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_DRIVE_FACTOR")
+}
+
 record(ao, "$(P)$(M):MovingDeadband") {
     field(DTYP, "asynFloat64")
+    field(PINI, "YES")
     field(OUT, "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_MOVING_DEADBAND")
     field(VAL, 50.0)
     field(EGU, "nm")

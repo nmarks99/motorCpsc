@@ -14,7 +14,15 @@ record(bi, "$(P)CPSC:FeedbackEnableRBV") {
 
 record(bi, "$(P)CPSC:FeedbackDone") {
     field(DTYP, "asynInt32")
+    field(PINI, "YES")
     field(INP, "@asyn($(PORT),$(ADDR=0),$(TIMEOUT=1))CPSC_FEEDBACK_DONE")
     field(ZNAM, "Done")
     field(ONAM, "Active")
+}
+
+record(longout, "$(P)CPSC:Temperature") {
+    field(DTYP, "asynInt32")
+    field(PINI, "YES")
+    field(VAL, 293)
+    field(OUT, "@asyn($(PORT),$(ADDR=0),$(TIMEOUT=1))CPSC_TEMPERATURE")
 }

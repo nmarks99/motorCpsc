@@ -17,6 +17,16 @@ record(ao, "$(P)$(M):DriveFactor") {
     field(OUT, "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_DRIVE_FACTOR")
 }
 
+record(longout, "$(P)$(M):StepSize") {
+    field(DTYP, "asynInt32")
+    field(PINI, "YES")
+    field(OUT, "@asyn($(PORT),$(ADDR),$(TIMEOUT=1))CPSC_STEP_SIZE")
+    field(VAL, 100)
+    field(DRVL, 1)
+    field(DRVH, 100)
+    field(EGU, "%")
+}
+
 record(ao, "$(P)$(M):MovingDeadband") {
     field(DTYP, "asynFloat64")
     field(PINI, "YES")

@@ -43,10 +43,11 @@ class epicsShareClass CpscMotorController : public asynMotorController {
     bool closed_loop_ = false;
 
   protected:
-    static constexpr int NUM_PARAMS = 6;
+    static constexpr int NUM_PARAMS = 10;
     int CpscFrequencyIndex_;
     int CpscTemperatureIndex_;
     int CpscDriveFactorIndex_;
+    int CpscStepSizeIndex_;
     int CpscMovingDeadbandIndex_;
     int CpscFeedbackEnableIndex_;
     int CpscFeedbackDoneIndex_;

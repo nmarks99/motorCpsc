@@ -41,6 +41,7 @@ CpscMotorController::CpscMotorController(const char* portName, const char* CpscM
     createParam("CPSC_FREQUENCY", asynParamInt32, &CpscFrequencyIndex_);
     createParam("CPSC_TEMPERATURE", asynParamInt32, &CpscTemperatureIndex_);
     createParam("CPSC_DRIVE_FACTOR", asynParamFloat64, &CpscDriveFactorIndex_);
+    createParam("CPSC_STEP_SIZE", asynParamInt32, &CpscStepSizeIndex_);
     createParam("CPSC_MOVING_DEADBAND", asynParamFloat64, &CpscMovingDeadbandIndex_);
     createParam("CPSC_FEEDBACK_ENABLE", asynParamInt32, &CpscFeedbackEnableIndex_);
     createParam("CPSC_FEEDBACK_DONE", asynParamInt32, &CpscFeedbackDoneIndex_);
@@ -58,7 +59,6 @@ CpscMotorController::CpscMotorController(const char* portName, const char* CpscM
         asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "%s: cannot connect to CPSC motor controller\n",
                   functionName);
     }
-    // Set correct end of string characters
     pasynOctetSyncIO->setInputEos(pasynUserController_, "\r\n", 2);
     pasynOctetSyncIO->setOutputEos(pasynUserController_, "\r\n", 2);
 
@@ -124,8 +124,8 @@ asynStatus CpscMotorController::writeInt32(asynUser* pasynUser, epicsInt32 value
         } else {
             sprintf(outString_, "FBXT");
         }
-        printf("Enable command: %s\n", outString_);
-        // status = writeReadController();
+        printf("Enabling closed loop: %s\n", outString_);
+        status = writeReadController();
     } else {
         status = asynMotorController::writeInt32(pasynUser, value);
     }
@@ -199,6 +199,9 @@ asynStatus CpscMotorAxis::stop(double acceleration) {
 
 asynStatus CpscMotorAxis::move(double position, int relative, double min_velocity, double max_velocity,
                                double acceleration) {
+
+    asynStatus asyn_status = asynSuccess;
+
     if (pC_->closed_loop_) {
         // FBCS [SP1] [ABS] [SP2] [ABS] [SP3] [ABS]
         // [SPx] - setpoint in meters
@@ -217,29 +220,43 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
             break;
         }
         printf("Closed loop move: %s\n", pC_->outString_);
-        // pC_->writeReadController();
+        pC_->writeReadController();
     } else {
-        // open loop move
-        // MOV [ADDR] [DIR] [FREQ] [RSS] [STEPS] [TEMP] [STAGE] [DF]
-        double nm_to_move = position - last_pos_;
-        bool dir = nm_to_move > 0 ? 1 : 0;
-        int steps_to_move = nm_to_move * STEPS_PER_NANOMETER;
-
-        // Get frequency, temperature, and drive factor
-        int freq = 0;
-        pC_->getIntegerParam(axisNo_, pC_->CpscFrequencyIndex_, &freq);
-        double df = 0.0;
-        pC_->getDoubleParam(axisNo_, pC_->CpscDriveFactorIndex_, &df);
-        int temp = 0;
-        pC_->getIntegerParam(pC_->CpscTemperatureIndex_, &temp);
-
-        printf("Open loop move: %d steps (%lf nm) in %d direction\n", steps_to_move, nm_to_move, dir);
-        printf("MOV %d %d %d 100 %d %d %s %lf\n",
-               axisIndex_, dir, freq, steps_to_move, temp,
-               stage_name_.c_str(), df);
+        pC_->setIntegerParam(pC_->motorStatusProblem_, 1);
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Open loop moved not implemeted trough motor record\n");
+        // constexpr int STEPS_MAX = 50000;
+        // // open loop move
+        // // MOV [ADDR] [DIR] [FREQ] [RSS] [STEPS] [TEMP] [STAGE] [DF]
+        // double current_pos = 0.0;
+        // pC_->getDoubleParam(axisNo_, pC_->motorPosition_, &current_pos);
+        // printf("Current pos = %.1lf\n", current_pos);
+        // printf("Target pos = %.1lf\n", position);
+        // double nm_to_move = position - current_pos;
+        // int dir = nm_to_move > 0 ? 0 : 1;
+        // long steps_to_move = static_cast<long>(fabs(nm_to_move) * STEPS_PER_NANOMETER);
+        // steps_to_move = steps_to_move > STEPS_MAX ? STEPS_MAX : steps_to_move;
+//
+        // // Get frequency, temperature, relative step size, and drive factor
+        // int freq = 0;
+        // pC_->getIntegerParam(axisNo_, pC_->CpscFrequencyIndex_, &freq);
+        // int temp = 0;
+        // pC_->getIntegerParam(pC_->CpscTemperatureIndex_, &temp);
+        // int rss = 0;
+        // pC_->getIntegerParam(pC_->CpscStepSizeIndex_, &rss);
+        // double df = 0.0;
+        // pC_->getDoubleParam(axisNo_, pC_->CpscDriveFactorIndex_, &df);
+//
+        // printf("Open loop move: %ld steps (%lf nm) in %d direction\n", steps_to_move, nm_to_move, dir);
+        // sprintf(pC_->outString_, "MOV %d %d %d %d %ld %d %s %.1lf", axisIndex_, dir, freq, rss, steps_to_move, temp,
+               // stage_name_.c_str(), df);
+        // printf("%s\n", pC_->outString_);
+        // asyn_status = pC_->writeReadController();
+        // if (asyn_status) {
+            // asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Move command failed\n");
+        // }
     }
 
-    return asynSuccess;
+    return asyn_status;
 }
 
 asynStatus CpscMotorAxis::poll(bool* moving) {
@@ -257,6 +274,7 @@ asynStatus CpscMotorAxis::poll(bool* moving) {
     double position_m = atof((const char*)&pC_->inString_);
     long long_position_nm = DRIVER_RESOLUTION * position_m;
     setDoubleParam(pC_->motorPosition_, long_position_nm); // RRBV [nanometers]
+    setDoubleParam(pC_->motorEncoderPosition_, long_position_nm);
 
     // Determine if moving with position delta and configurable deadband
     double moving_deadband = 0.0;

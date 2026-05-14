@@ -6,7 +6,7 @@
 # | 1e-9   | meters      |
 
 # Motor records
-file "$(MOTOR)/db/asyn_motor.db"
+file "$(MOTOR_CPSC)/db/cpsc_asyn_motor.db"
 {
 pattern
 { M,         DTYP,     PORT,  ADDR,       DESC,  EGU,  DIR,  VMAX,  VELO,  VBAS,  ACCL,  BDST,  BVEL,  BACC,   MRES,  PREC,  DHLM,  DLLM,  RTRY,  INIT}

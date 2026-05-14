@@ -23,8 +23,8 @@ class epicsShareClass CpscMotorAxis : public asynMotorAxis {
     CpscMotorController* pC_;
     int axisIndex_;
     std::string stage_name_;
-    double last_pos_;
-    bool first_poll_;
+    double last_pos_ = 0.0;
+    bool first_poll_ = true;
 
     friend class CpscMotorController;
 };
@@ -41,6 +41,7 @@ class epicsShareClass CpscMotorController : public asynMotorController {
 
   private:
     bool closed_loop_ = false;
+    bool has_moved_ = false;
 
   protected:
     static constexpr int NUM_PARAMS = 10;

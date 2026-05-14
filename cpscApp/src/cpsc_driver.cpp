@@ -123,8 +123,8 @@ asynStatus CpscMotorController::writeInt32(asynUser* pasynUser, epicsInt32 value
             sprintf(outString_, "%s%.1lf %d", fben_cmd.c_str(), df, temp);
         } else {
             sprintf(outString_, "FBXT");
+            has_moved_ = false;
         }
-        printf("Enabling closed loop: %s\n", outString_);
         status = writeReadController();
     } else {
         status = asynMotorController::writeInt32(pasynUser, value);
@@ -158,7 +158,11 @@ asynStatus CpscMotorController::poll() {
     std::vector<int> fbstatus = split_char_arr(inString_, ',');
     closed_loop_ = fbstatus[FBStatus::ENABLED];
     setIntegerParam(CpscFeedbackEnableIndex_, closed_loop_);
-    int done = fbstatus[FBStatus::DONE];
+
+    int done = 1;
+    if (has_moved_) {
+        done = closed_loop_ ? fbstatus[FBStatus::DONE] : 1;
+    }
     setIntegerParam(CpscFeedbackDoneIndex_, done);
 
     callParamCallbacks();
@@ -170,7 +174,7 @@ asynStatus CpscMotorController::poll() {
 // =============
 
 CpscMotorAxis::CpscMotorAxis(CpscMotorController* pC, int axisNo, const char* sensor_name)
-    : asynMotorAxis(pC, axisNo), pC_(pC), stage_name_(sensor_name), last_pos_(0.0), first_poll_(true) {
+    : asynMotorAxis(pC, axisNo), pC_(pC), stage_name_(sensor_name) {
 
     axisIndex_ = axisNo + 1;
 
@@ -203,6 +207,7 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
     asynStatus asyn_status = asynSuccess;
 
     if (pC_->closed_loop_) {
+        pC_->has_moved_ = true;
         // FBCS [SP1] [ABS] [SP2] [ABS] [SP3] [ABS]
         // [SPx] - setpoint in meters
         // [ABS] - 1 absolute positioning (relative to center of stage)
@@ -222,6 +227,7 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
         printf("Closed loop move: %s\n", pC_->outString_);
         pC_->writeReadController();
     } else {
+        // MOV 1 0 600 100 99 293 CS021-RLS.X 1
         pC_->setIntegerParam(pC_->motorStatusProblem_, 1);
         asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Open loop moved not implemeted trough motor record\n");
         // constexpr int STEPS_MAX = 50000;
@@ -276,18 +282,23 @@ asynStatus CpscMotorAxis::poll(bool* moving) {
     setDoubleParam(pC_->motorPosition_, long_position_nm); // RRBV [nanometers]
     setDoubleParam(pC_->motorEncoderPosition_, long_position_nm);
 
-    // Determine if moving with position delta and configurable deadband
-    double moving_deadband = 0.0;
-    pC_->getDoubleParam(axisNo_, pC_->CpscMovingDeadbandIndex_, &moving_deadband);
+    // First check if feedback is active. If so, then no need for delta check
     int done = 1;
-    if (!first_poll_) {
-        double delta = fabs((double)long_position_nm - last_pos_);
-        if (delta > moving_deadband) {
-            done = 0;
+    if (pC_->closed_loop_) {
+        pC_->getIntegerParam(pC_->CpscFeedbackDoneIndex_, &done);
+    } else {
+        // Determine if moving with position delta and configurable deadband
+        double moving_deadband = 0.0;
+        pC_->getDoubleParam(axisNo_, pC_->CpscMovingDeadbandIndex_, &moving_deadband);
+        if (!first_poll_) {
+            double delta = fabs((double)long_position_nm - last_pos_);
+            if (delta > moving_deadband) {
+                done = 0;
+            }
         }
+        last_pos_ = static_cast<double>(long_position_nm);
+        first_poll_ = false;
     }
-    last_pos_ = static_cast<double>(long_position_nm);
-    first_poll_ = false;
 
     *moving = !done;
     setIntegerParam(pC_->motorStatusDone_, done);

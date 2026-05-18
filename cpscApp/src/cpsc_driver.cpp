@@ -227,39 +227,7 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
         printf("Closed loop move: %s\n", pC_->outString_);
         pC_->writeReadController();
     } else {
-        // MOV 1 0 600 100 99 293 CS021-RLS.X 1
-        pC_->setIntegerParam(pC_->motorStatusProblem_, 1);
-        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Open loop moved not implemeted trough motor record\n");
-        // constexpr int STEPS_MAX = 50000;
-        // // open loop move
-        // // MOV [ADDR] [DIR] [FREQ] [RSS] [STEPS] [TEMP] [STAGE] [DF]
-        // double current_pos = 0.0;
-        // pC_->getDoubleParam(axisNo_, pC_->motorPosition_, &current_pos);
-        // printf("Current pos = %.1lf\n", current_pos);
-        // printf("Target pos = %.1lf\n", position);
-        // double nm_to_move = position - current_pos;
-        // int dir = nm_to_move > 0 ? 0 : 1;
-        // long steps_to_move = static_cast<long>(fabs(nm_to_move) * STEPS_PER_NANOMETER);
-        // steps_to_move = steps_to_move > STEPS_MAX ? STEPS_MAX : steps_to_move;
-//
-        // // Get frequency, temperature, relative step size, and drive factor
-        // int freq = 0;
-        // pC_->getIntegerParam(axisNo_, pC_->CpscFrequencyIndex_, &freq);
-        // int temp = 0;
-        // pC_->getIntegerParam(pC_->CpscTemperatureIndex_, &temp);
-        // int rss = 0;
-        // pC_->getIntegerParam(pC_->CpscStepSizeIndex_, &rss);
-        // double df = 0.0;
-        // pC_->getDoubleParam(axisNo_, pC_->CpscDriveFactorIndex_, &df);
-//
-        // printf("Open loop move: %ld steps (%lf nm) in %d direction\n", steps_to_move, nm_to_move, dir);
-        // sprintf(pC_->outString_, "MOV %d %d %d %d %ld %d %s %.1lf", axisIndex_, dir, freq, rss, steps_to_move, temp,
-               // stage_name_.c_str(), df);
-        // printf("%s\n", pC_->outString_);
-        // asyn_status = pC_->writeReadController();
-        // if (asyn_status) {
-            // asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Move command failed\n");
-        // }
+        asynPrint(pasynUser_, ASYN_TRACE_ERROR, "Open loop moves not implemented through motor record\n");
     }
 
     callParamCallbacks();

@@ -4,29 +4,33 @@
 # | 1e-3   | micrometers |
 # | 1e-6   | millimeters |
 # | 1e-9   | meters      |
-
 # Motor records
 file "$(MOTOR_CPSC)/db/cpsc_asyn_motor.db"
 {
 pattern
-{ M,         DTYP,     PORT,  ADDR,       DESC,  EGU,  DIR,  VMAX,  VELO,  VBAS,  ACCL,  BDST,  BVEL,  BACC,   MRES,  PREC,  DHLM,  DLLM,  RTRY,  INIT}
-{m1,  "asynMotor",  "CPSC1",     0,  "Motor 1",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     3,     0,     0,     0,    ""}
-{m2,  "asynMotor",  "CPSC1",     1,  "Motor 2",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     3,     0,     0,     0,    ""}
-{m3,  "asynMotor",  "CPSC1",     2,  "Motor 3",   um,  Pos,  15.0,   3.0,  0.05,   0.5,     0,   1.0,     2,  0.001,     3,     0,     0,     0,    ""}
+{ M,         DTYP,            PORT,  ADDR,           DESC,  EGU,  DIR,  VMAX,  VELO,  VBAS,  ACCL,  BDST,  BVEL,  BACC,   MRES,  PREC,  DHLM,   DLLM,  RTRY,  INIT}
+{m1,  "asynMotor",  "$(CPSC_PORT)",     0,  "CS021-RLS.X",   um,  Pos,  10.0,   1.0,   0.1,   0.1,     0,   1.0,     2,  0.001,     3,  3000,  -3000,     0,    ""}
+{m2,  "asynMotor",  "$(CPSC_PORT)",     1,  "CS021-RLS.Y",   um,  Pos,  10.0,   1.0,   0.1,   0.1,     0,   1.0,     2,  0.001,     3,  3000,  -3000,     0,    ""}
+{m3,  "asynMotor",  "$(CPSC_PORT)",     2,  "CS021-RLS.Z",   um,  Pos,  10.0,   1.0,   0.1,   0.1,     0,   1.0,     2,  0.001,     3,  3000,  -3000,     0,    ""}
 }
 
-# Extra per-axis parameters
-file "$(MOTOR_CPSC)/db/cpsc_axis.db"
-{
-pattern
-{ M,     PORT,  ADDR}
-{m1,  "CPSC1",     0}
-{m2,  "CPSC1",     1}
-{m3,  "CPSC1",     2}
+# asynRecord used for debugging and sending open loop move commands
+file "$(ASYN)/db/asynRecord.db" {
+{R="asyn_$(CPSC_PORT)", PORT="$(CPSC_PORT)_ETH", ADDR=0, OMAX=1000, IMAX=1000}
 }
 
 # Extra controller parameters
-file "$(MOTOR_CPSC)/db/cpsc_controller.db"
+file "$(MOTOR_CPSC)/db/cpsc_controller.db" {
+{PORT="$(CPSC_PORT)"}
+}
+
+# Extra per-axis parameters
+# Note: Requires cpsc_controller.db to be loaded
+file "$(MOTOR_CPSC)/db/cpsc_axis.db"
 {
-{PORT="CPSC1"}
+pattern
+{ M,            PORT,  ADDR,          STAGE}
+{m1,  "$(CPSC_PORT)",     0,  "CS021-RLS.X"}
+{m2,  "$(CPSC_PORT)",     1,  "CS021-RLS.Y"}
+{m3,  "$(CPSC_PORT)",     2,  "CS021-RLS.Z"}
 }

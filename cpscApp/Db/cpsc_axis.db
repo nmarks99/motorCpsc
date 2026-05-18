@@ -34,3 +34,57 @@ record(ao, "$(P)$(M):MovingDeadband") {
     field(VAL, 50.0)
     field(EGU, "nm")
 }
+
+
+# ################
+# Open loop motion
+# ################
+
+record(longout, "$(P)$(M):OpenLoopSteps") {
+    field(DESC, "Steps to move")
+    field(EGU, "Steps")
+    field(VAL, 100)
+    field(DRVL, 1)
+    field(DRVH, 50000)
+}
+
+record(bo, "$(P)$(M):StepFwd") {
+    field(DESC, "Start open loop move forward")
+    field(DOL, "{const: 1}")
+    field(OMSL, "closed_loop")
+    field(OUT, "$(P)$(M):open_loop_dir.VAL PP")
+}
+
+record(bo, "$(P)$(M):StepRev") {
+    field(DESC, "Start open loop move backward")
+    field(DOL, "{const: 0}")
+    field(OMSL, "closed_loop")
+    field(OUT, "$(P)$(M):open_loop_dir.VAL PP")
+}
+
+record(bi, "$(P)$(M):open_loop_dir") {
+    field(DESC, "Direction to move")
+    field(FLNK, "$(P)$(M):calc_open_loop_move.PROC")
+}
+
+record(calcout, "$(P)$(M):calc_open_loop_move") {
+    field(DESC, "Only move if feedback disabled")
+    field(INPA, "$(P)CPSC:FeedbackEnableRBV.RVAL")
+    field(CALC, "!A")
+    field(OOPT, "When Non-zero")
+    field(OUT, "$(P)$(M):open_loop_move_cmd.PROC")
+}
+
+record(printf, "$(P)$(M):open_loop_move_cmd") {
+    field(DESC, "Builds the move cmd string")
+    field(INP0, {calc: {expr:"A+1", args:[{const: $(ADDR)}]}})
+    field(INP1, "$(P)$(M):open_loop_dir.VAL")
+    field(INP2, "$(P)$(M):Frequency.VAL")
+    field(INP3, "$(P)$(M):StepSize.VAL")
+    field(INP4, "$(P)$(M):OpenLoopSteps.VAL")
+    field(INP5, "$(P)CPSC:Temperature.VAL")
+    field(INP6, "{const: '$(STAGE)'}")
+    field(INP7, "$(P)$(M):DriveFactor.VAL")
+    field(FMT, "MOV %d %d %d %d %d %d %s %.1f")
+    field(OUT, "$(P)asyn_$(PORT).AOUT PP")
+}

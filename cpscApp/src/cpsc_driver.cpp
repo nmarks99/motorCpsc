@@ -262,6 +262,7 @@ asynStatus CpscMotorAxis::move(double position, int relative, double min_velocit
         // }
     }
 
+    callParamCallbacks();
     return asyn_status;
 }
 

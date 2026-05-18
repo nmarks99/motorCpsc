@@ -1,14 +1,12 @@
 # Connect to device
-drvAsynIPPortConfigure("CPSC_ETH", "164.54.115.41:2000")
+epicsEnvSet("CPSC_PORT", "CPSC1")
+drvAsynIPPortConfigure("$(CPSC_PORT)_ETH", "164.54.115.41:2000")
 
 # Create controller and axes
-CpscMotorCreateController("CPSC1", "CPSC_ETH", 3, 50, 200)
-CpscMotorCreateAxis("CPSC1", 0, "CS021-RLS.X")
-CpscMotorCreateAxis("CPSC1", 1, "CS021-RLS.Y")
-CpscMotorCreateAxis("CPSC1", 2, "CS021-RLS.Z")
-
-# Load asynRecord for debugging
-dbLoadRecords("$(ASYN)/db/asynRecord.db", "P=$(PREFIX), R=asyn_1, PORT=CPSC_ETH, ADDR=0, OMAX=$(OUT_BUFF=1000), IMAX=$(IN_BUFF=1000)")
+CpscMotorCreateController("$(CPSC_PORT)", "$(CPSC_PORT)_ETH", 3, 50, 200)
+CpscMotorCreateAxis("$(CPSC_PORT)", 0, "CS021-RLS.X")
+CpscMotorCreateAxis("$(CPSC_PORT)", 1, "CS021-RLS.Y")
+CpscMotorCreateAxis("$(CPSC_PORT)", 2, "CS021-RLS.Z")
 
 # Load motor records and extra CPSC databases
-dbLoadTemplate("cpsc.substitutions", "P=$(PREFIX)")
+dbLoadTemplate("cpsc.substitutions", "P=$(PREFIX),CPSC_PORT=$(CPSC_PORT)")

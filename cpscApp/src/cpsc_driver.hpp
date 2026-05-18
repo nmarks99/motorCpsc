@@ -44,7 +44,7 @@ class epicsShareClass CpscMotorController : public asynMotorController {
     bool has_moved_ = false;
 
   protected:
-    static constexpr int NUM_PARAMS = 10;
+    static constexpr int NUM_PARAMS = 7;
     int CpscFrequencyIndex_;
     int CpscTemperatureIndex_;
     int CpscDriveFactorIndex_;

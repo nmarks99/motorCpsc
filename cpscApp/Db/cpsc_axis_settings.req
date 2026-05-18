@@ -1,2 +1,5 @@
 $(P)$(M):Frequency.VAL
+$(P)$(M):DriveFactor.VAL
+$(P)$(M):StepSize.VAL
 $(P)$(M):MovingDeadband.VAL
+$(P)$(M):OpenLoopSteps.VAL
